@@ -200,19 +200,22 @@ class ClaudeCodeClient:
                 stderr=asyncio.subprocess.PIPE
             )
 
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(input=prompt.encode()),
-                timeout=120
-            )
-            
+            try:
+                stdout, stderr = await asyncio.wait_for(
+                    proc.communicate(input=prompt.encode()),
+                    timeout=120
+                )
+            except asyncio.TimeoutError:
+                proc.kill()
+                await proc.communicate()
+                raise Exception("Claude Code CLI timed out after 120 seconds")
+
             if proc.returncode != 0:
                 error_msg = stderr.decode() if stderr else "Unknown error calling Claude Code"
                 raise Exception(f"Claude Code CLI error: {error_msg}")
-            
+
             response_text = stdout.decode().strip()
-            
-        except asyncio.TimeoutError:
-            raise Exception("Claude Code CLI timed out after 120 seconds")
+
         except FileNotFoundError:
             raise Exception("Claude Code CLI not found. Please ensure 'claude' is installed and in PATH")
         except Exception as e:

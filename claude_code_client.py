@@ -87,13 +87,12 @@ class ClaudeCodeClient:
                     model_short = next((name for name in ["opus", "sonnet", "haiku"] if name in model.lower()), "sonnet")
                     cmd.extend(["--model", model_short])
         
-        # Add the prompt
-        cmd.append(prompt)
-        
         try:
-            # Run Claude Code CLI
+            # Run Claude Code CLI, passing the prompt via stdin to avoid
+            # command-line length limits
             result = subprocess.run(
                 cmd,
+                input=prompt,
                 capture_output=True,
                 text=True,
                 timeout=120  # 2 minute timeout
@@ -193,17 +192,19 @@ class ClaudeCodeClient:
                     model_short = next((name for name in ["opus", "sonnet", "haiku"] if name in model.lower()), "sonnet")
                     cmd.extend(["--model", model_short])
         
-        cmd.append(prompt)
-        
         try:
-            # Run Claude Code CLI asynchronously
+            # Run Claude Code CLI asynchronously, sending the prompt via stdin
             proc = await asyncio.create_subprocess_exec(
                 *cmd,
+                stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
-            
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=120)
+
+            stdout, stderr = await asyncio.wait_for(
+                proc.communicate(input=prompt.encode()),
+                timeout=120
+            )
             
             if proc.returncode != 0:
                 error_msg = stderr.decode() if stderr else "Unknown error calling Claude Code"

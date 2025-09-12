@@ -72,6 +72,7 @@ class MessagesRouter:
                 messages=openai_messages,
                 max_tokens=max_tokens,
                 temperature=temperature if temperature is not NOT_GIVEN else None,
+                stop=stop_sequences if stop_sequences is not NOT_GIVEN else None,
             )
             text = response.choices[0].message["content"]
             usage = response.usage
@@ -153,6 +154,7 @@ class AsyncMessagesRouter:
                 messages=openai_messages,
                 max_tokens=max_tokens,
                 temperature=temperature if temperature is not NOT_GIVEN else None,
+                stop=stop_sequences if stop_sequences is not NOT_GIVEN else None,
             )
             text = response.choices[0].message["content"]
             usage = response.usage

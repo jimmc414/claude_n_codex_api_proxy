@@ -52,7 +52,7 @@ class MessagesRouter:
         top_k: Union[int, NotGiven] = NOT_GIVEN,
         top_p: Union[float, NotGiven] = NOT_GIVEN,
         **kwargs,
-    ) -> Message:
+        ) -> Message:
         if self.is_codex:
             return self.router.client.create_message(
                 messages=messages,
@@ -63,17 +63,24 @@ class MessagesRouter:
                 stream=stream if stream is not NOT_GIVEN else False,
             )
         else:
-            openai_messages = []
+            openai_messages: List[Dict[str, str]] = []
             if system is not NOT_GIVEN and system:
                 openai_messages.append({"role": "system", "content": system})
-            openai_messages.extend(messages)
+            for msg in messages:
+                content = msg.get("content") if isinstance(msg, dict) else msg.content
+                if isinstance(content, list):
+                    content = "".join(
+                        part.get("text", "") if isinstance(part, dict) else getattr(part, "text", "")
+                        for part in content
+                    )
+                openai_messages.append({"role": msg.get("role") if isinstance(msg, dict) else msg.role, "content": content})
             response = self.router.client.chat.completions.create(
                 model=model,
                 messages=openai_messages,
                 max_tokens=max_tokens,
                 temperature=temperature if temperature is not NOT_GIVEN else None,
             )
-            text = response.choices[0].message["content"]
+            text = response.choices[0].message.content
             usage = response.usage
             return Message(
                 id=response.id,
@@ -144,17 +151,24 @@ class AsyncMessagesRouter:
                 stream=stream if stream is not NOT_GIVEN else False,
             )
         else:
-            openai_messages = []
+            openai_messages: List[Dict[str, str]] = []
             if system is not NOT_GIVEN and system:
                 openai_messages.append({"role": "system", "content": system})
-            openai_messages.extend(messages)
+            for msg in messages:
+                content = msg.get("content") if isinstance(msg, dict) else msg.content
+                if isinstance(content, list):
+                    content = "".join(
+                        part.get("text", "") if isinstance(part, dict) else getattr(part, "text", "")
+                        for part in content
+                    )
+                openai_messages.append({"role": msg.get("role") if isinstance(msg, dict) else msg.role, "content": content})
             response = await self.router.client.chat.completions.create(
                 model=model,
                 messages=openai_messages,
                 max_tokens=max_tokens,
                 temperature=temperature if temperature is not NOT_GIVEN else None,
             )
-            text = response.choices[0].message["content"]
+            text = response.choices[0].message.content
             usage = response.usage
             return Message(
                 id=response.id,

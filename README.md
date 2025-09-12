@@ -1,11 +1,11 @@
-# Claude Code API Router
+# Claude & Codex API Router
 
-A universal HTTP proxy and Python library that automatically routes Anthropic API calls to Claude Code (local inference) when the API key is set to all 9s, otherwise uses the standard Anthropic API.
+A universal HTTP proxy and Python library that automatically routes Anthropic or OpenAI API calls to local CLI tools (Claude Code or Codex) when the API key is set to all 9s, otherwise uses the real cloud APIs.
 
 ## Two Solutions Included
 
 ### 1. Universal HTTP Proxy (Works with ANY language/tool)
-An HTTP/HTTPS proxy server that intercepts all Anthropic API calls from any application, regardless of programming language.
+An HTTP/HTTPS proxy server that intercepts Anthropic or OpenAI API calls from any application, regardless of programming language.
 
 ### 2. Python Library (Python-specific)
 A drop-in replacement for the Anthropic Python client that handles routing internally.
@@ -14,8 +14,8 @@ A drop-in replacement for the Anthropic Python client that handles routing inter
 
 - **Universal Compatibility**: HTTP proxy works with ANY programming language or tool
 - **Transparent Routing**: No code changes needed for existing projects (with proxy)
-- **Claude Code Integration**: Automatically routes to local Claude Code CLI when API key is all 9s
-- **API Compatibility**: Maintains full Anthropic API response format
+- **Claude Code & Codex Integration**: Automatically routes to local Claude Code or Codex CLI when API key is all 9s
+- **API Compatibility**: Maintains Anthropic/OpenAI API response format
 - **Easy Configuration**: Just set your API key to all 9s to enable local routing
 - **Python Library**: Drop-in replacement for Anthropic Python client
 - **Async Support**: Includes both synchronous and asynchronous clients
@@ -26,9 +26,10 @@ A drop-in replacement for the Anthropic Python client that handles routing inter
 pip install -r requirements.txt
 ```
 
-Make sure you have Claude Code CLI installed and available in your PATH:
+Make sure you have the relevant CLI installed and available in your PATH:
 ```bash
-claude --version
+claude --version   # for Claude Code
+codex --version    # for Codex
 ```
 
 ## Quick Start
@@ -41,11 +42,12 @@ python setup_proxy.py  # One-time setup
 ./start_proxy.sh       # Start proxy server
 ```
 
-2. **Configure your environment:**
+2. **Configure your environment (examples):**
 ```bash
 export HTTP_PROXY=http://localhost:8080
 export HTTPS_PROXY=http://localhost:8080
-export ANTHROPIC_API_KEY=999999999999  # All 9s for Claude Code
+export ANTHROPIC_API_KEY=999999999999   # All 9s for Claude Code
+export OPENAI_API_KEY=999999999999      # All 9s for Codex
 ```
 
 3. **Use from ANY language/tool:**
@@ -62,18 +64,19 @@ curl https://api.anthropic.com/v1/messages \
 ```python
 from anthropic_router import create_client
 
-# Use Claude Code (local inference)
-client = create_client(api_key="999999999999")
+# Use Codex locally
+client = create_client(provider="codex", api_key="999999999999")
 
-# Or use the real Anthropic API
-# client = create_client(api_key="sk-ant-api03-your-real-key")
+# Or use Claude Code locally
+# client = create_client(provider="claude", api_key="999999999999")
+
+# Or use cloud providers
+# client = create_client(provider="anthropic", api_key="sk-ant-real-key")
 
 message = client.messages.create(
     model="claude-3-sonnet-20240229",
     max_tokens=100,
-    messages=[
-        {"role": "user", "content": "Hello, how are you?"}
-    ]
+    messages=[{"role": "user", "content": "Hello, how are you?"}]
 )
 
 print(message.content[0].text)

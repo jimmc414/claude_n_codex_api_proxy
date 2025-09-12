@@ -7,6 +7,7 @@ from anthropic import Anthropic, AsyncAnthropic
 from anthropic.types import Message, MessageParam
 from anthropic._types import NOT_GIVEN, NotGiven
 from claude_code_client import ClaudeCodeClient
+from openai_router import OpenAIRouter
 
 
 class AnthropicRouter:
@@ -170,15 +171,24 @@ class AsyncMessagesRouter:
 
 
 # Convenience function to create a client
-def create_client(api_key: Optional[str] = None) -> AnthropicRouter:
+def create_client(
+    api_key: Optional[str] = None,
+    provider: Optional[str] = None,
+    default_provider: str = "claude",
+) -> Any:
     """
-    Create an Anthropic client that automatically routes to Claude Code
-    if the API key is all 9s.
-    
+    Create a client that automatically routes to local inference when the API key is all 9s.
+
     Args:
-        api_key: The API key to use. If all 9s, routes to Claude Code.
-    
+        api_key: API key for the selected provider.
+        provider: "claude"/"anthropic" or "codex"/"openai". Overrides the default.
+        default_provider: Which provider to use if none is specified.
+
     Returns:
-        AnthropicRouter instance
+        Router instance for the chosen provider.
     """
+    selected = provider or os.environ.get("AI_ROUTER_DEFAULT", default_provider)
+    selected = selected.lower()
+    if selected in {"codex", "openai"}:
+        return OpenAIRouter(api_key=api_key)
     return AnthropicRouter(api_key=api_key)

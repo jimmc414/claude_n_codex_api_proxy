@@ -1,10 +1,9 @@
 """
 Claude Code Client - Interface for routing API calls to Claude Code CLI
 """
-import json
 import subprocess
 import asyncio
-from typing import Any, Dict, List, Optional, Union
+from typing import Dict, List, Optional
 from datetime import datetime
 from anthropic.types import Message, TextBlock, Usage
 

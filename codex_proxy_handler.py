@@ -54,10 +54,16 @@ class CodexProxyHandler(ClaudeCodeProxyHandler):
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
             )
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(input=prompt.encode("utf-8")),
-                timeout=120,
-            )
+            try:
+                stdout, stderr = await asyncio.wait_for(
+                    proc.communicate(input=prompt.encode("utf-8")),
+                    timeout=120,
+                )
+            except asyncio.TimeoutError:
+                proc.kill()
+                await proc.communicate()
+                logger.error("Codex CLI timed out")
+                raise Exception("Codex CLI timed out after 120 seconds")
             if proc.returncode != 0:
                 error_msg = stderr.decode("utf-8", errors="ignore") if stderr else "Unknown error"
                 logger.error(f"Codex CLI returned non-zero: {proc.returncode}")
@@ -67,9 +73,6 @@ class CodexProxyHandler(ClaudeCodeProxyHandler):
                 logger.warning("Codex response truncated due to length")
                 response_text = response_text[:MAX_PROMPT_LENGTH]
             return response_text
-        except asyncio.TimeoutError:
-            logger.error("Codex CLI timed out")
-            raise Exception("Codex CLI timed out after 120 seconds")
         except FileNotFoundError:
             logger.error("Codex CLI not found")
             raise Exception("Codex CLI not found. Please ensure 'codex' is installed and in PATH.")

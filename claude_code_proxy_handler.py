@@ -421,33 +421,36 @@ class ClaudeCodeProxyHandler:
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
-            
-            # Send prompt via stdin and wait for completion with timeout
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(input=prompt.encode('utf-8')),
-                timeout=120  # 2 minute timeout
-            )
-            
+
+            try:
+                # Send prompt via stdin and wait for completion with timeout
+                stdout, stderr = await asyncio.wait_for(
+                    proc.communicate(input=prompt.encode('utf-8')),
+                    timeout=120  # 2 minute timeout
+                )
+            except asyncio.TimeoutError:
+                proc.kill()
+                await proc.communicate()
+                logger.error("Claude Code CLI timed out")
+                raise Exception("Claude Code CLI timed out after 120 seconds")
+
             if proc.returncode != 0:
                 error_msg = stderr.decode('utf-8', errors='ignore') if stderr else "Unknown error"
                 # Don't log full error to avoid leaking sensitive info
                 logger.error(f"Claude Code CLI returned non-zero: {proc.returncode}")
                 raise Exception("Claude Code CLI error")
-            
+
             response_text = stdout.decode('utf-8', errors='ignore').strip()
-            
+
             # Validate response isn't too large
             if len(response_text) > MAX_PROMPT_LENGTH:
                 logger.warning("Claude Code response truncated due to length")
                 response_text = response_text[:MAX_PROMPT_LENGTH]
-            
+
             logger.debug(f"Claude Code response length: {len(response_text)} chars")
-            
+
             return response_text
-            
-        except asyncio.TimeoutError:
-            logger.error("Claude Code CLI timed out")
-            raise Exception("Claude Code CLI timed out after 120 seconds")
+
         except FileNotFoundError:
             logger.error("Claude Code CLI not found")
             raise Exception(

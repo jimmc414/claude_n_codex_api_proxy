@@ -3,9 +3,9 @@
 Example usage of the Anthropic Router that demonstrates both normal API calls
 and Claude Code routing when the API key is all 9s.
 """
-import os
 import asyncio
 from anthropic_router import AnthropicRouter, AsyncAnthropicRouter, create_client
+import os
 
 
 def example_basic_usage():

@@ -24,6 +24,7 @@ A drop-in replacement for the Anthropic Python client that handles routing inter
 
 ```bash
 pip install -r requirements.txt
+# On Windows you can also use: py -m pip install -r requirements.txt
 ```
 
 Make sure you have the relevant CLI installed and available in your PATH:
@@ -39,15 +40,28 @@ codex --version    # for Codex
 1. **Setup and start the proxy:**
 ```bash
 python setup_proxy.py  # One-time setup
+# macOS / Linux
 ./start_proxy.sh       # Start proxy server
+# Windows
+python start_proxy.py
 ```
 
 2. **Configure your environment (examples):**
+
+macOS/Linux (bash/zsh):
 ```bash
 export HTTP_PROXY=http://localhost:8080
 export HTTPS_PROXY=http://localhost:8080
 export ANTHROPIC_API_KEY=999999999999   # All 9s for Claude Code
 export OPENAI_API_KEY=999999999999      # All 9s for Codex
+```
+
+Windows (PowerShell):
+```powershell
+$env:HTTP_PROXY="http://localhost:8080"
+$env:HTTPS_PROXY="http://localhost:8080"
+$env:ANTHROPIC_API_KEY="999999999999"   # All 9s for Claude Code
+$env:OPENAI_API_KEY="999999999999"      # All 9s for Codex
 ```
 
 3. **Use from ANY language/tool:**
@@ -130,6 +144,7 @@ The following API key formats will trigger Claude Code routing:
 - `claude_code_proxy_handler.py` - Proxy request handler for Claude Code
 - `setup_proxy.py` - One-time setup script for proxy
 - `start_proxy.sh` - Convenient proxy launcher script
+- `start_proxy.py` - Cross-platform proxy launcher script
 - `test_universal.py` - Tests for multiple languages/tools
 
 ### Python Library

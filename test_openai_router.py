@@ -140,6 +140,52 @@ def test_stream_passed_to_openai(monkeypatch):
     assert msg.content[0].text == "hello"
 
 
+def test_sampling_params_and_metadata_passed_to_openai(monkeypatch):
+    captured = {}
+
+    class MockResponse:
+        id = "resp"
+
+        class Choice:
+            def __init__(self):
+                self.message = type("Msg", (), {"content": "ok"})()
+
+        choices = [Choice()]
+
+        class Usage:
+            prompt_tokens = 0
+            completion_tokens = 0
+
+        usage = Usage()
+
+    class MockChatCompletions:
+        def create(self, **kwargs):
+            captured.update(kwargs)
+            return MockResponse()
+
+    class MockChat:
+        def __init__(self):
+            self.completions = MockChatCompletions()
+
+    class MockClient:
+        def __init__(self, *args, **kwargs):
+            self.chat = MockChat()
+
+    monkeypatch.setattr(openai_router, "OpenAI", lambda api_key=None: MockClient())
+    router = OpenAIRouter(api_key="real-key")
+    router.messages.create(
+        model="gpt-4",
+        max_tokens=5,
+        messages=[{"role": "user", "content": "hi"}],
+        top_p=0.9,
+        top_k=40,
+        metadata={"foo": "bar"},
+    )
+    assert captured["top_p"] == 0.9
+    assert captured["top_k"] == 40
+    assert captured["metadata"] == {"foo": "bar"}
+
+
 def test_async_stream_passed_to_openai(monkeypatch):
     captured = {}
 
@@ -193,6 +239,58 @@ def test_async_stream_passed_to_openai(monkeypatch):
     msg = asyncio.run(run())
     assert captured["stream"] is True
     assert msg.content[0].text == "hello"
+
+
+def test_async_sampling_params_and_metadata_passed_to_openai(monkeypatch):
+    captured = {}
+
+    class MockResponse:
+        id = "resp"
+
+        class Choice:
+            def __init__(self):
+                self.message = type("Msg", (), {"content": "ok"})()
+
+        choices = [Choice()]
+
+        class Usage:
+            prompt_tokens = 0
+            completion_tokens = 0
+
+        usage = Usage()
+
+    class MockChatCompletions:
+        async def create(self, **kwargs):
+            captured.update(kwargs)
+            return MockResponse()
+
+    class MockChat:
+        def __init__(self):
+            self.completions = MockChatCompletions()
+
+    class MockClient:
+        def __init__(self, *args, **kwargs):
+            self.chat = MockChat()
+
+    monkeypatch.setattr(openai_router, "AsyncOpenAI", lambda api_key=None: MockClient())
+    router = AsyncOpenAIRouter(api_key="real-key")
+
+    async def run():
+        await router.messages.create(
+            model="gpt-4",
+            max_tokens=5,
+            messages=[{"role": "user", "content": "hi"}],
+            top_p=0.9,
+            top_k=40,
+            metadata={"foo": "bar"},
+        )
+
+    import asyncio
+
+    asyncio.run(run())
+    assert captured["top_p"] == 0.9
+    assert captured["top_k"] == 40
+    assert captured["metadata"] == {"foo": "bar"}
 
 
 def test_dict_content_normalization(monkeypatch):

@@ -10,6 +10,7 @@ from datetime import datetime
 import uuid
 import logging
 import re
+from utils import run_subprocess_async
 
 logger = logging.getLogger(__name__)
 
@@ -414,43 +415,9 @@ class ClaudeCodeProxyHandler:
         logger.debug(f"Running Claude CLI with model: {model}")
         
         try:
-            # Run Claude Code CLI asynchronously with stdin for prompt
-            proc = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+            response_text = await run_subprocess_async(
+                cmd, prompt, "Claude Code", include_stderr=False
             )
-
-            try:
-                # Send prompt via stdin and wait for completion with timeout
-                stdout, stderr = await asyncio.wait_for(
-                    proc.communicate(input=prompt.encode('utf-8')),
-                    timeout=120  # 2 minute timeout
-                )
-            except asyncio.TimeoutError:
-                proc.kill()
-                await proc.communicate()
-                logger.error("Claude Code CLI timed out")
-                raise Exception("Claude Code CLI timed out after 120 seconds")
-
-            if proc.returncode != 0:
-                error_msg = stderr.decode('utf-8', errors='ignore') if stderr else "Unknown error"
-                # Don't log full error to avoid leaking sensitive info
-                logger.error(f"Claude Code CLI returned non-zero: {proc.returncode}")
-                raise Exception("Claude Code CLI error")
-
-            response_text = stdout.decode('utf-8', errors='ignore').strip()
-
-            # Validate response isn't too large
-            if len(response_text) > MAX_PROMPT_LENGTH:
-                logger.warning("Claude Code response truncated due to length")
-                response_text = response_text[:MAX_PROMPT_LENGTH]
-
-            logger.debug(f"Claude Code response length: {len(response_text)} chars")
-
-            return response_text
-
         except FileNotFoundError:
             logger.error("Claude Code CLI not found")
             raise Exception(
@@ -459,3 +426,12 @@ class ClaudeCodeProxyHandler:
         except Exception as e:
             logger.error(f"Error calling Claude Code: {type(e).__name__}")
             raise
+
+        # Validate response isn't too large
+        if len(response_text) > MAX_PROMPT_LENGTH:
+            logger.warning("Claude Code response truncated due to length")
+            response_text = response_text[:MAX_PROMPT_LENGTH]
+
+        logger.debug(f"Claude Code response length: {len(response_text)} chars")
+
+        return response_text

@@ -10,6 +10,21 @@ from codex_client import CodexClient
 from utils import is_all_nines_api_key
 
 
+def _normalize_content(content: Any) -> str:
+    """Normalize message content into a plain string for OpenAI."""
+    if isinstance(content, dict):
+        content_type = content.get("type")
+        if content_type == "text":
+            return content.get("text", "")
+        return f"[{content_type or 'unsupported'} content]"
+    if isinstance(content, list):
+        parts = [_normalize_content(part).strip() for part in content]
+        return " ".join(part for part in parts if part)
+    if isinstance(content, str):
+        return content
+    return str(content)
+
+
 class OpenAIRouter:
     """A wrapper around the OpenAI client that routes to Codex CLI when the API key is all 9s."""
 
@@ -65,12 +80,13 @@ class MessagesRouter:
                 openai_messages.append({"role": "system", "content": system})
             for msg in messages:
                 content = msg.get("content") if isinstance(msg, dict) else msg.content
-                if isinstance(content, list):
-                    content = "".join(
-                        part.get("text", "") if isinstance(part, dict) else getattr(part, "text", "")
-                        for part in content
-                    )
-                openai_messages.append({"role": msg.get("role") if isinstance(msg, dict) else msg.role, "content": content})
+                content = _normalize_content(content)
+                openai_messages.append(
+                    {
+                        "role": msg.get("role") if isinstance(msg, dict) else msg.role,
+                        "content": content,
+                    }
+                )
             response = self.router.client.chat.completions.create(
                 model=model,
                 messages=openai_messages,
@@ -172,12 +188,13 @@ class AsyncMessagesRouter:
                 openai_messages.append({"role": "system", "content": system})
             for msg in messages:
                 content = msg.get("content") if isinstance(msg, dict) else msg.content
-                if isinstance(content, list):
-                    content = "".join(
-                        part.get("text", "") if isinstance(part, dict) else getattr(part, "text", "")
-                        for part in content
-                    )
-                openai_messages.append({"role": msg.get("role") if isinstance(msg, dict) else msg.role, "content": content})
+                content = _normalize_content(content)
+                openai_messages.append(
+                    {
+                        "role": msg.get("role") if isinstance(msg, dict) else msg.role,
+                        "content": content,
+                    }
+                )
             response = await self.router.client.chat.completions.create(
                 model=model,
                 messages=openai_messages,

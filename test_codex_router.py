@@ -78,3 +78,14 @@ async def test_async_codex_stream_not_supported():
             messages=[{"role": "user", "content": "hi"}],
             stream=True,
         )
+
+
+def test_invalid_provider():
+    with pytest.raises(ValueError):
+        create_client(provider="invalid")
+
+
+def test_invalid_provider_env(monkeypatch):
+    monkeypatch.setenv("AI_ROUTER_DEFAULT", "invalid")
+    with pytest.raises(ValueError):
+        create_client()

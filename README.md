@@ -124,6 +124,8 @@ message = client.messages.create(
 print(message.content[0].text)
 ```
 
+Valid values for `provider` are `"claude"`, `"anthropic"`, `"codex"`, and `"openai"`. Passing any other value to `create_client` or via the `AI_ROUTER_DEFAULT` environment variable will raise a `ValueError`.
+
 ## How It Works
 
 1. When you create a client with an API key that's all 9s (e.g., "999999999999"), the router automatically routes requests to the local Claude Code or Codex CLI

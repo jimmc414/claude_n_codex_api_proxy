@@ -168,6 +168,7 @@ def create_client(
     Args:
         api_key: API key for the selected provider.
         provider: "claude"/"anthropic" or "codex"/"openai". Overrides the default.
+            Unsupported values raise ``ValueError``.
         default_provider: Which provider to use if none is specified.
 
     Returns:
@@ -175,6 +176,13 @@ def create_client(
     """
     selected = provider or os.environ.get("AI_ROUTER_DEFAULT", default_provider)
     selected = selected.lower()
+
+    valid = {"claude", "anthropic", "codex", "openai"}
+    if selected not in valid:
+        raise ValueError(
+            f"Unsupported provider '{selected}'. Valid options: {', '.join(sorted(valid))}"
+        )
+
     if selected in {"codex", "openai"}:
         return OpenAIRouter(api_key=api_key)
     return AnthropicRouter(api_key=api_key)

@@ -8,7 +8,7 @@ A universal HTTP proxy and Python library that automatically routes Anthropic or
 An HTTP/HTTPS proxy server that intercepts Anthropic or OpenAI API calls from any application, regardless of programming language.
 
 ### 2. Python Library (Python-specific)
-A drop-in replacement for the Anthropic Python client that handles routing internally.
+Drop-in replacements for the Anthropic and OpenAI Python clients that handle routing internally, routing to Claude Code or Codex when appropriate.
 
 ## Features
 
@@ -17,7 +17,7 @@ A drop-in replacement for the Anthropic Python client that handles routing inter
 - **Claude Code & Codex Integration**: Automatically routes to local Claude Code or Codex CLI when API key is all 9s
 - **API Compatibility**: Maintains Anthropic/OpenAI API response format
 - **Easy Configuration**: Just set your API key to all 9s to enable local routing
-- **Python Library**: Drop-in replacement for Anthropic Python client
+- **Python Library**: Drop-in replacement clients for Anthropic and OpenAI Python SDKs
 - **Async Support**: Includes both synchronous and asynchronous clients
 
 ## Installation
@@ -98,10 +98,10 @@ print(message.content[0].text)
 
 ## How It Works
 
-1. When you create a client with an API key that's all 9s (e.g., "999999999999"), the router automatically detects this and routes all API calls to Claude Code CLI
-2. The router converts Anthropic API format to Claude Code CLI format
-3. Responses from Claude Code are converted back to Anthropic API format
-4. Your code doesn't need to change - it works exactly like the standard Anthropic client
+1. When you create a client with an API key that's all 9s (e.g., "999999999999"), the router automatically routes requests to the local Claude Code or Codex CLI
+2. The router converts standard Anthropic/OpenAI API format to the respective local CLI format
+3. Responses from the local CLI are converted back to the standard API format
+4. Your code doesn't need to change—it behaves like the official Anthropic or OpenAI client
 
 ## Examples
 
@@ -121,21 +121,21 @@ python example.py
 
 Run the test suite to verify the routing works correctly:
 ```bash
-python test_router.py
+pytest
 ```
 
 ## API Key Detection
 
-The following API key formats will trigger Claude Code routing:
+The following API key formats will trigger local routing (Claude Code or Codex):
 - `"999999999999"` - Pure 9s
-- `"sk-ant-999999999999"` - With standard prefix
+- `"sk-ant-999999999999"` or `"sk-openai-999999999999"` - With standard prefix
 - Any string where the last segment (after splitting by `-`) is all 9s
 
 ## Limitations
 
-- Streaming is not yet supported when routing to Claude Code
-- Token counting is approximate when using Claude Code
-- Some advanced Anthropic API features may not be available through Claude Code
+- Streaming is not yet supported when routing to Claude Code or Codex
+- Token counting is approximate when using local CLI tools
+- Some advanced API features may not be available through Claude Code or Codex
 
 ## Files
 
@@ -148,10 +148,13 @@ The following API key formats will trigger Claude Code routing:
 - `test_universal.py` - Tests for multiple languages/tools
 
 ### Python Library
-- `anthropic_router.py` - Python client routing logic
+- `anthropic_router.py` - Anthropic/Claude Code routing logic
+- `openai_router.py` - OpenAI/Codex routing logic
 - `claude_code_client.py` - Claude Code CLI interface
+- `codex_client.py` - Codex CLI interface
 - `example.py` - Python library usage examples
-- `test_router.py` - Python library test suite
+- `test_router.py` - Anthropic/Claude Code routing tests
+- `test_openai_router.py` - OpenAI/Codex routing tests
 
 ### Common
 - `requirements.txt` - Python dependencies

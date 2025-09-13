@@ -113,6 +113,8 @@ class MessagesRouter:
                             text_parts.append(part)
                     if getattr(event, "usage", None):
                         usage = event.usage
+                if first_event is None:
+                    raise RuntimeError("No chunks were received from the streaming response")
                 final = first_event
                 text = "".join(text_parts)
                 usage = usage or getattr(final, "usage", None)
@@ -224,6 +226,8 @@ class AsyncMessagesRouter:
                             text_parts.append(part)
                     if getattr(event, "usage", None):
                         usage = event.usage
+                if first_event is None:
+                    raise RuntimeError("No chunks were received from the streaming response")
                 final = first_event
                 text = "".join(text_parts)
                 usage = usage or getattr(final, "usage", None)

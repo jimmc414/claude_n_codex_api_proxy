@@ -49,13 +49,15 @@ class MessagesRouter:
         **kwargs,
         ) -> Message:
         if self.is_codex:
+            if stream is not NOT_GIVEN and stream:
+                raise NotImplementedError("Streaming is not yet supported when routing to Codex")
             return self.router.client.create_message(
                 messages=messages,
                 model=model,
                 max_tokens=max_tokens,
                 system=system if system is not NOT_GIVEN else None,
                 temperature=temperature if temperature is not NOT_GIVEN else None,
-                stream=stream if stream is not NOT_GIVEN else False,
+                stream=False,
             )
         else:
             openai_messages: List[Dict[str, str]] = []
@@ -75,11 +77,33 @@ class MessagesRouter:
                 max_tokens=max_tokens,
                 temperature=temperature if temperature is not NOT_GIVEN else None,
                 stop=stop_sequences if stop_sequences is not NOT_GIVEN else None,
+                stream=stream if stream is not NOT_GIVEN else False,
+                **kwargs,
             )
-            text = response.choices[0].message.content
-            usage = response.usage
+            if stream is not NOT_GIVEN and stream:
+                text_parts: List[str] = []
+                first_event = None
+                usage = None
+                for event in response:
+                    if first_event is None:
+                        first_event = event
+                    delta = getattr(event.choices[0], "delta", None) if event.choices else None
+                    if delta is not None:
+                        part = getattr(delta, "content", None)
+                        if part:
+                            text_parts.append(part)
+                    if getattr(event, "usage", None):
+                        usage = event.usage
+                final = first_event
+                text = "".join(text_parts)
+                usage = usage or getattr(final, "usage", None)
+                response_id = getattr(final, "id", "")
+            else:
+                text = response.choices[0].message.content
+                usage = response.usage
+                response_id = response.id
             return Message(
-                id=response.id,
+                id=response_id,
                 content=[TextBlock(text=text, type="text")],
                 model=model,
                 role="assistant",
@@ -132,13 +156,15 @@ class AsyncMessagesRouter:
         **kwargs,
     ) -> Message:
         if self.is_codex:
+            if stream is not NOT_GIVEN and stream:
+                raise NotImplementedError("Streaming is not yet supported when routing to Codex")
             return await self.router.client.acreate_message(
                 messages=messages,
                 model=model,
                 max_tokens=max_tokens,
                 system=system if system is not NOT_GIVEN else None,
                 temperature=temperature if temperature is not NOT_GIVEN else None,
-                stream=stream if stream is not NOT_GIVEN else False,
+                stream=False,
             )
         else:
             openai_messages: List[Dict[str, str]] = []
@@ -158,11 +184,33 @@ class AsyncMessagesRouter:
                 max_tokens=max_tokens,
                 temperature=temperature if temperature is not NOT_GIVEN else None,
                 stop=stop_sequences if stop_sequences is not NOT_GIVEN else None,
+                stream=stream if stream is not NOT_GIVEN else False,
+                **kwargs,
             )
-            text = response.choices[0].message.content
-            usage = response.usage
+            if stream is not NOT_GIVEN and stream:
+                text_parts: List[str] = []
+                first_event = None
+                usage = None
+                async for event in response:
+                    if first_event is None:
+                        first_event = event
+                    delta = getattr(event.choices[0], "delta", None) if event.choices else None
+                    if delta is not None:
+                        part = getattr(delta, "content", None)
+                        if part:
+                            text_parts.append(part)
+                    if getattr(event, "usage", None):
+                        usage = event.usage
+                final = first_event
+                text = "".join(text_parts)
+                usage = usage or getattr(final, "usage", None)
+                response_id = getattr(final, "id", "")
+            else:
+                text = response.choices[0].message.content
+                usage = response.usage
+                response_id = response.id
             return Message(
-                id=response.id,
+                id=response_id,
                 content=[TextBlock(text=text, type="text")],
                 model=model,
                 role="assistant",

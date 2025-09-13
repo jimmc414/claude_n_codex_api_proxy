@@ -307,12 +307,12 @@ class AIInterceptor:
             status_code = 404
             response_data = {}
             path = flow.request.path.lower()
-            if '/v1/messages' in path:
+            if '/v1/messages' in path or '/v1/chat/completions' in path:
                 response_data = await self.codex_handler.handle_messages_request(
                     request_data,
                     flow.request.method,
                 )
-            elif '/v1/complete' in path:
+            elif '/v1/complete' in path or '/v1/completions' in path:
                 response_data = await self.codex_handler.handle_complete_request(
                     request_data,
                     flow.request.method,
@@ -332,18 +332,20 @@ class AIInterceptor:
                     }
                 }
     
-            if 'error' in response_data:
-                error_type = response_data.get('error', {}).get('type', '')
-                if 'not_found' in error_type:
-                    status_code = 404
-                elif 'invalid' in error_type or 'request' in error_type:
-                    status_code = 400
-                elif 'unauthorized' in error_type:
-                    status_code = 401
+            status_code = response_data.pop('status_code', None)
+            if status_code is None:
+                if 'error' in response_data:
+                    error_type = response_data.get('error', {}).get('type', '')
+                    if 'not_found' in error_type:
+                        status_code = 404
+                    elif 'invalid' in error_type or 'request' in error_type:
+                        status_code = 400
+                    elif 'unauthorized' in error_type:
+                        status_code = 401
+                    else:
+                        status_code = 500
                 else:
-                    status_code = 500
-            else:
-                status_code = 200
+                    status_code = 200
     
             response_json = json.dumps(response_data)
             flow.response = http.Response.make(

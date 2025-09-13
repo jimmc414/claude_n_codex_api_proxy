@@ -91,3 +91,105 @@ def test_async_stop_sequences_passed_to_openai(monkeypatch):
 
     asyncio.run(run())
     assert captured["stop"] == ["END"]
+
+
+def test_stream_passed_to_openai(monkeypatch):
+    captured = {}
+
+    class MockChunk:
+        id = "resp_stream"
+
+        class Choice:
+            def __init__(self):
+                self.delta = type("Delta", (), {"content": "hello"})()
+
+        choices = [Choice()]
+
+        class Usage:
+            prompt_tokens = 0
+            completion_tokens = 0
+
+        usage = Usage()
+
+    class MockStreamResponse:
+        def __iter__(self):
+            return iter([MockChunk()])
+
+    class MockChatCompletions:
+        def create(self, **kwargs):
+            captured.update(kwargs)
+            return MockStreamResponse()
+
+    class MockChat:
+        def __init__(self):
+            self.completions = MockChatCompletions()
+
+    class MockClient:
+        def __init__(self, *args, **kwargs):
+            self.chat = MockChat()
+
+    monkeypatch.setattr(openai_router, "OpenAI", lambda api_key=None: MockClient())
+    router = OpenAIRouter(api_key="real-key")
+    msg = router.messages.create(
+        model="gpt-4",
+        max_tokens=5,
+        messages=[{"role": "user", "content": "hi"}],
+        stream=True,
+    )
+    assert captured["stream"] is True
+    assert msg.content[0].text == "hello"
+
+
+def test_async_stream_passed_to_openai(monkeypatch):
+    captured = {}
+
+    class MockChunk:
+        id = "resp_stream"
+
+        class Choice:
+            def __init__(self):
+                self.delta = type("Delta", (), {"content": "hello"})()
+
+        choices = [Choice()]
+
+        class Usage:
+            prompt_tokens = 0
+            completion_tokens = 0
+
+        usage = Usage()
+
+    class MockStreamResponse:
+        def __aiter__(self):
+            async def gen():
+                yield MockChunk()
+            return gen()
+
+    class MockChatCompletions:
+        async def create(self, **kwargs):
+            captured.update(kwargs)
+            return MockStreamResponse()
+
+    class MockChat:
+        def __init__(self):
+            self.completions = MockChatCompletions()
+
+    class MockClient:
+        def __init__(self, *args, **kwargs):
+            self.chat = MockChat()
+
+    monkeypatch.setattr(openai_router, "AsyncOpenAI", lambda api_key=None: MockClient())
+    router = AsyncOpenAIRouter(api_key="real-key")
+
+    async def run():
+        return await router.messages.create(
+            model="gpt-4",
+            max_tokens=5,
+            messages=[{"role": "user", "content": "hi"}],
+            stream=True,
+        )
+
+    import asyncio
+
+    msg = asyncio.run(run())
+    assert captured["stream"] is True
+    assert msg.content[0].text == "hello"

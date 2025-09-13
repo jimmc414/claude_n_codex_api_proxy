@@ -73,6 +73,34 @@ curl https://api.anthropic.com/v1/messages \
   -d '{"model":"claude-3-sonnet-20240229","messages":[{"role":"user","content":"Hello"}],"max_tokens":50}'
 ```
 
+## Allowing Additional API Endpoints
+
+By default the proxy only permits a curated set of `/v1` API paths. The default
+configuration covers common Anthropic and OpenAI endpoints and falls back to
+allow any path under `/v1/`.
+
+To permit other endpoints you can either override the entire allow-list or
+extend it:
+
+- **Override** with a comma-separated list via the `ALLOWED_PATHS` environment
+  variable or `--allowed-paths` option:
+
+  ```bash
+  ALLOWED_PATHS="^/v1/my/endpoint$" python start_proxy.py
+  # or
+  python start_proxy.py --allowed-paths '^/v1/my/endpoint$'
+  ```
+
+- **Extend** the defaults by passing `--allowed-path` one or more times:
+
+  ```bash
+  python start_proxy.py --allowed-path '^/v1/beta$' --allowed-path '^/v1/other$'
+  ```
+
+Patterns are regular expressions that are combined at startup. This allows new
+API endpoints to be exposed through the proxy without modifying the source
+code.
+
 ### Option 2: Python Library
 
 ```python

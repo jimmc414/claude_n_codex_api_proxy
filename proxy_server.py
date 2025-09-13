@@ -7,6 +7,7 @@ Includes security improvements and bug fixes.
 import asyncio
 import json
 import logging
+import os
 import sys
 import re
 from typing import Optional, Dict, Any
@@ -26,16 +27,28 @@ logger = logging.getLogger(__name__)
 MAX_REQUEST_SIZE = 10 * 1024 * 1024  # 10MB max request size
 MAX_PROMPT_LENGTH = 100000  # Max characters in prompt
 ALLOWED_METHODS = {'GET', 'POST', 'OPTIONS'}
-# Allow only specific API endpoints while preventing traversal or unexpected paths
-# - /v1/messages
-# - /v1/complete
-# - /v1/chat/completions
-# - /v1/completions
-# - /v1/models or /v1/models/{model}
-# Optional query strings are permitted, but additional path segments are rejected
-ALLOWED_PATHS_REGEX = re.compile(
-    r'^/v1/(?:messages|complete|chat/completions|completions|models(?:/[A-Za-z0-9_.-]+)?)(?:\?.*)?$'
-)
+# Default allowed API endpoints. The final regex is built from this list at
+# startup and can be extended or replaced via configuration.
+DEFAULT_ALLOWED_PATH_PATTERNS = [
+    r'^/v1/messages(?:\?.*)?$',
+    r'^/v1/complete(?:\?.*)?$',
+    r'^/v1/chat/completions(?:\?.*)?$',
+    r'^/v1/completions(?:\?.*)?$',
+    r'^/v1/models(?:/[A-Za-z0-9_.-]+)?(?:\?.*)?$',
+    r'^/v1/.*'  # Fallback: allow any /v1/* endpoint
+]
+
+
+def build_allowed_paths_regex(patterns):
+    """Compile a regex from a list of pattern strings."""
+    combined = "|".join(f"(?:{p})" for p in patterns)
+    return re.compile(combined)
+
+
+# Compiled regex used during request validation. This may be overridden at
+# runtime via environment variables or command-line options.
+ALLOWED_PATHS_REGEX = build_allowed_paths_regex(DEFAULT_ALLOWED_PATH_PATTERNS)
+
 
 
 class AIInterceptor:
@@ -447,11 +460,25 @@ def main():
     parser.add_argument('--verbose', action='store_true', help='Enable verbose logging')
     parser.add_argument('--default-backend', choices=['claude', 'codex'], default='claude',
                         help='Default local backend when API key is all 9s')
+    parser.add_argument('--allowed-paths', help='Comma-separated regex patterns to replace default allowed paths')
+    parser.add_argument('--allowed-path', action='append', default=[],
+                        help='Additional regex pattern to allow')
 
     args = parser.parse_args()
 
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
+
+    # Build allowed paths regex from defaults, environment, and CLI overrides
+    override = args.allowed_paths or os.environ.get('ALLOWED_PATHS')
+    if override:
+        patterns = [p.strip() for p in override.split(',') if p.strip()]
+    else:
+        patterns = list(DEFAULT_ALLOWED_PATH_PATTERNS)
+    if args.allowed_path:
+        patterns.extend(args.allowed_path)
+    global ALLOWED_PATHS_REGEX
+    ALLOWED_PATHS_REGEX = build_allowed_paths_regex(patterns)
 
     try:
         asyncio.run(start_proxy(args.host, args.port, args.default_backend))

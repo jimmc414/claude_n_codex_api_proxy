@@ -2,6 +2,10 @@ import json
 import pytest
 import proxy_server
 
+DEFAULT_REGEX = proxy_server.build_allowed_paths_regex(
+    proxy_server.DEFAULT_ALLOWED_PATH_PATTERNS
+)
+
 
 class DummyRequest:
     def __init__(self, path, method="POST", content=b"{}"):
@@ -18,7 +22,7 @@ class DummyFlow:
 
 @pytest.mark.asyncio
 async def test_chat_completions_success(monkeypatch):
-    interceptor = proxy_server.AIInterceptor()
+    interceptor = proxy_server.AIInterceptor(DEFAULT_REGEX)
 
     async def mock_messages(data, method):
         return {"id": "1"}
@@ -33,7 +37,7 @@ async def test_chat_completions_success(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_chat_completions_not_found(monkeypatch):
-    interceptor = proxy_server.AIInterceptor()
+    interceptor = proxy_server.AIInterceptor(DEFAULT_REGEX)
 
     async def mock_messages(data, method):
         return {"error": {"type": "not_found_error", "message": "missing"}}
@@ -48,7 +52,7 @@ async def test_chat_completions_not_found(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_completions_success(monkeypatch):
-    interceptor = proxy_server.AIInterceptor()
+    interceptor = proxy_server.AIInterceptor(DEFAULT_REGEX)
 
     async def mock_complete(data, method):
         return {"completion": "ok"}
@@ -63,7 +67,7 @@ async def test_completions_success(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_completions_invalid(monkeypatch):
-    interceptor = proxy_server.AIInterceptor()
+    interceptor = proxy_server.AIInterceptor(DEFAULT_REGEX)
 
     async def mock_complete(data, method):
         return {"error": {"type": "invalid_request_error", "message": "bad"}}

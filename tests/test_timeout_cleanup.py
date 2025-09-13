@@ -13,6 +13,7 @@ from claude_code_client import ClaudeCodeClient
 from codex_client import CodexClient
 from claude_code_proxy_handler import ClaudeCodeProxyHandler
 from codex_proxy_handler import CodexProxyHandler
+from utils import CLITimeoutError
 
 SCRIPT = Path(__file__).with_name("hanging_cli.py")
 
@@ -34,7 +35,7 @@ async def test_client_process_killed_on_timeout(client_cls, monkeypatch, tmp_pat
 
     monkeypatch.setattr(asyncio, "wait_for", _fast_timeout)
 
-    with pytest.raises(Exception):
+    with pytest.raises(CLITimeoutError):
         await client.acreate_message(
             messages=[{"role": "user", "content": "hi"}],
             model="test",
@@ -56,7 +57,7 @@ async def test_handler_process_killed_on_timeout(handler_cls, monkeypatch, tmp_p
 
     monkeypatch.setattr(asyncio, "wait_for", _fast_timeout)
 
-    with pytest.raises(Exception):
+    with pytest.raises(CLITimeoutError):
         await handler._call_claude_cli_async("prompt")
 
     pid = int(pid_file.read_text())

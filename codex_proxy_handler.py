@@ -1,7 +1,12 @@
 """Codex Proxy Handler - Handles API requests routed through the proxy for Codex CLI."""
 from typing import Any, Dict, Optional
 from claude_code_proxy_handler import ClaudeCodeProxyHandler, MAX_PROMPT_LENGTH, logger
-from utils import run_subprocess_async
+from utils import (
+    run_subprocess_async,
+    CLINotFoundError,
+    CLITimeoutError,
+    CLIError,
+)
 
 CODEX_VALID_MODELS = {
     "code-davinci-002",
@@ -49,11 +54,14 @@ class CodexProxyHandler(ClaudeCodeProxyHandler):
             response_text = await run_subprocess_async(
                 cmd, prompt, "Codex", include_stderr=False
             )
-        except FileNotFoundError:
+        except CLINotFoundError as e:
             logger.error("Codex CLI not found")
-            raise Exception("Codex CLI not found. Please ensure 'codex' is installed and in PATH.")
-        except Exception as e:
-            logger.error(f"Error calling Codex: {type(e).__name__}")
+            raise e
+        except CLITimeoutError as e:
+            logger.error("Codex CLI timed out")
+            raise e
+        except CLIError as e:
+            logger.error(f"Error calling Codex: {e}")
             raise
 
         if len(response_text) > MAX_PROMPT_LENGTH:

@@ -3,7 +3,13 @@ from typing import Dict, List, Optional
 from datetime import datetime
 from anthropic.types import Message, TextBlock, Usage
 from claude_code_client import ClaudeCodeClient
-from utils import run_subprocess, run_subprocess_async
+from utils import (
+    run_subprocess,
+    run_subprocess_async,
+    CLINotFoundError,
+    CLITimeoutError,
+    CLIError,
+)
 
 
 class CodexClient(ClaudeCodeClient):
@@ -32,7 +38,10 @@ class CodexClient(ClaudeCodeClient):
                         cmd.extend(["--model", name])
                         break
 
-        return run_subprocess(cmd, prompt, "Codex")
+        try:
+            return run_subprocess(cmd, prompt, "Codex")
+        except (CLINotFoundError, CLITimeoutError, CLIError):
+            raise
 
     def create_message(
         self,
@@ -84,7 +93,10 @@ class CodexClient(ClaudeCodeClient):
                         cmd.extend(["--model", name])
                         break
 
-        response_text = await run_subprocess_async(cmd, prompt, "Codex")
+        try:
+            response_text = await run_subprocess_async(cmd, prompt, "Codex")
+        except (CLINotFoundError, CLITimeoutError, CLIError):
+            raise
 
         message = Message(
             id="msg_codex_" + datetime.now().strftime("%Y%m%d%H%M%S"),

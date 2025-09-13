@@ -2,7 +2,13 @@
 from typing import Dict, List, Optional
 from datetime import datetime
 from anthropic.types import Message, TextBlock, Usage
-from utils import run_subprocess, run_subprocess_async
+from utils import (
+    run_subprocess,
+    run_subprocess_async,
+    CLINotFoundError,
+    CLITimeoutError,
+    CLIError,
+)
 
 
 class ClaudeCodeClient:
@@ -83,7 +89,10 @@ class ClaudeCodeClient:
                     model_short = next((name for name in ["opus", "sonnet", "haiku"] if name in model.lower()), "sonnet")
                     cmd.extend(["--model", model_short])
         
-        return run_subprocess(cmd, prompt, "Claude Code")
+        try:
+            return run_subprocess(cmd, prompt, "Claude Code")
+        except (CLINotFoundError, CLITimeoutError, CLIError):
+            raise
     
     def create_message(
         self,
@@ -169,7 +178,10 @@ class ClaudeCodeClient:
                     )
                     cmd.extend(["--model", model_short])
 
-        response_text = await run_subprocess_async(cmd, prompt, "Claude Code")
+        try:
+            response_text = await run_subprocess_async(cmd, prompt, "Claude Code")
+        except (CLINotFoundError, CLITimeoutError, CLIError):
+            raise
         
         # Create a Message object that matches Anthropic's format
         message = Message(

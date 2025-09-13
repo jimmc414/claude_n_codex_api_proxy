@@ -3,6 +3,18 @@ import subprocess
 from typing import List, Optional
 
 
+class CLIError(Exception):
+    """Base exception for CLI-related issues."""
+
+
+class CLINotFoundError(CLIError):
+    """Raised when the CLI executable is not found."""
+
+
+class CLITimeoutError(CLIError):
+    """Raised when the CLI command times out."""
+
+
 def is_all_nines_api_key(api_key: Optional[str]) -> bool:
     """Return True if the API key (after removing any prefix) is all 9s."""
     if not api_key:
@@ -23,19 +35,19 @@ def run_subprocess(cmd: List[str], input_text: str, name: str, *, timeout: int =
             timeout=timeout,
         )
     except subprocess.TimeoutExpired:
-        raise Exception(f"{name} CLI timed out after {timeout} seconds")
+        raise CLITimeoutError(f"{name} CLI timed out after {timeout} seconds")
     except FileNotFoundError:
-        raise Exception(
+        raise CLINotFoundError(
             f"{name} CLI not found. Please ensure '{cmd[0]}' is installed and in PATH"
         )
     except Exception as e:
-        raise Exception(f"Error calling {name}: {str(e)}")
+        raise CLIError(f"Error calling {name}: {str(e)}")
 
     if result.returncode != 0:
         error_msg = result.stderr or "Unknown error"
         if include_stderr:
-            raise Exception(f"{name} CLI error: {error_msg}")
-        raise Exception(f"{name} CLI error")
+            raise CLIError(f"{name} CLI error: {error_msg}")
+        raise CLIError(f"{name} CLI error")
 
     return result.stdout.strip()
 
@@ -51,7 +63,7 @@ async def run_subprocess_async(cmd: List[str], input_text: str, name: str, *, ti
             stderr=asyncio.subprocess.PIPE,
         )
     except FileNotFoundError:
-        raise Exception(
+        raise CLINotFoundError(
             f"{name} CLI not found. Please ensure '{cmd[0]}' is installed and in PATH"
         )
 
@@ -62,12 +74,12 @@ async def run_subprocess_async(cmd: List[str], input_text: str, name: str, *, ti
     except asyncio.TimeoutError:
         proc.kill()
         await proc.communicate()
-        raise Exception(f"{name} CLI timed out after {timeout} seconds")
+        raise CLITimeoutError(f"{name} CLI timed out after {timeout} seconds")
 
     if proc.returncode != 0:
         error_msg = stderr.decode() if stderr else "Unknown error"
         if include_stderr:
-            raise Exception(f"{name} CLI error: {error_msg}")
-        raise Exception(f"{name} CLI error")
+            raise CLIError(f"{name} CLI error: {error_msg}")
+        raise CLIError(f"{name} CLI error")
 
     return stdout.decode().strip()

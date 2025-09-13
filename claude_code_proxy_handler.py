@@ -10,7 +10,12 @@ from datetime import datetime
 import uuid
 import logging
 import re
-from utils import run_subprocess_async
+from utils import (
+    run_subprocess_async,
+    CLINotFoundError,
+    CLITimeoutError,
+    CLIError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -200,11 +205,26 @@ class ClaudeCodeProxyHandler:
             
             return response
             
-        except asyncio.TimeoutError:
+        except CLINotFoundError as e:
+            return {
+                "error": {
+                    "type": "not_found_error",
+                    "message": str(e),
+                }
+            }
+        except CLITimeoutError as e:
             return {
                 "error": {
                     "type": "timeout_error",
-                    "message": "Request timed out"
+                    "message": str(e),
+                }
+            }
+        except CLIError as e:
+            logger.error(f"Error handling messages request: {e}", exc_info=True)
+            return {
+                "error": {
+                    "type": "api_error",
+                    "message": str(e),
                 }
             }
         except Exception as e:
@@ -212,7 +232,7 @@ class ClaudeCodeProxyHandler:
             return {
                 "error": {
                     "type": "api_error",
-                    "message": "Failed to process request"
+                    "message": "Failed to process request",
                 }
             }
     
@@ -299,11 +319,26 @@ class ClaudeCodeProxyHandler:
             
             return response
             
-        except asyncio.TimeoutError:
+        except CLINotFoundError as e:
+            return {
+                "error": {
+                    "type": "not_found_error",
+                    "message": str(e),
+                }
+            }
+        except CLITimeoutError as e:
             return {
                 "error": {
                     "type": "timeout_error",
-                    "message": "Request timed out"
+                    "message": str(e),
+                }
+            }
+        except CLIError as e:
+            logger.error(f"Error handling complete request: {e}", exc_info=True)
+            return {
+                "error": {
+                    "type": "api_error",
+                    "message": str(e),
                 }
             }
         except Exception as e:
@@ -311,7 +346,7 @@ class ClaudeCodeProxyHandler:
             return {
                 "error": {
                     "type": "api_error",
-                    "message": "Failed to process request"
+                    "message": "Failed to process request",
                 }
             }
     
@@ -418,13 +453,14 @@ class ClaudeCodeProxyHandler:
             response_text = await run_subprocess_async(
                 cmd, prompt, "Claude Code", include_stderr=False
             )
-        except FileNotFoundError:
+        except CLINotFoundError as e:
             logger.error("Claude Code CLI not found")
-            raise Exception(
-                "Claude Code CLI not found. Please ensure 'claude' is installed and in PATH."
-            )
-        except Exception as e:
-            logger.error(f"Error calling Claude Code: {type(e).__name__}")
+            raise e
+        except CLITimeoutError as e:
+            logger.error("Claude Code CLI timed out")
+            raise e
+        except CLIError as e:
+            logger.error(f"Error calling Claude Code: {e}")
             raise
 
         # Validate response isn't too large

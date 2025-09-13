@@ -92,8 +92,11 @@ class MessagesRouter:
                 messages=openai_messages,
                 max_tokens=max_tokens,
                 temperature=temperature if temperature is not NOT_GIVEN else None,
+                top_p=top_p if top_p is not NOT_GIVEN else None,
+                top_k=top_k if top_k is not NOT_GIVEN else None,
                 stop=stop_sequences if stop_sequences is not NOT_GIVEN else None,
                 stream=stream if stream is not NOT_GIVEN else False,
+                metadata=metadata if metadata is not NOT_GIVEN else None,
                 **kwargs,
             )
             if stream is not NOT_GIVEN and stream:
@@ -200,8 +203,11 @@ class AsyncMessagesRouter:
                 messages=openai_messages,
                 max_tokens=max_tokens,
                 temperature=temperature if temperature is not NOT_GIVEN else None,
+                top_p=top_p if top_p is not NOT_GIVEN else None,
+                top_k=top_k if top_k is not NOT_GIVEN else None,
                 stop=stop_sequences if stop_sequences is not NOT_GIVEN else None,
                 stream=stream if stream is not NOT_GIVEN else False,
+                metadata=metadata if metadata is not NOT_GIVEN else None,
                 **kwargs,
             )
             if stream is not NOT_GIVEN and stream:

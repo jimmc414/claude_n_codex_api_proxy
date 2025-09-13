@@ -7,6 +7,7 @@ from openai import OpenAI, AsyncOpenAI
 from anthropic.types import Message, MessageParam, TextBlock, Usage
 from anthropic._types import NOT_GIVEN, NotGiven
 from codex_client import CodexClient
+from utils import is_all_nines_api_key
 
 
 class OpenAIRouter:
@@ -14,17 +15,11 @@ class OpenAIRouter:
 
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
-        self._is_codex_mode = self._check_codex_mode()
+        self._is_codex_mode = is_all_nines_api_key(self.api_key)
         if self._is_codex_mode:
             self.client = CodexClient()
         else:
             self.client = OpenAI(api_key=self.api_key)
-
-    def _check_codex_mode(self) -> bool:
-        if not self.api_key:
-            return False
-        key_part = self.api_key.split('-')[-1] if '-' in self.api_key else self.api_key
-        return all(c == '9' for c in key_part)
 
     @property
     def messages(self):
@@ -105,17 +100,11 @@ class AsyncOpenAIRouter:
 
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or os.environ.get("OPENAI_API_KEY", "")
-        self._is_codex_mode = self._check_codex_mode()
+        self._is_codex_mode = is_all_nines_api_key(self.api_key)
         if self._is_codex_mode:
             self.client = CodexClient()
         else:
             self.client = AsyncOpenAI(api_key=self.api_key)
-
-    def _check_codex_mode(self) -> bool:
-        if not self.api_key:
-            return False
-        key_part = self.api_key.split('-')[-1] if '-' in self.api_key else self.api_key
-        return all(c == '9' for c in key_part)
 
     @property
     def messages(self):

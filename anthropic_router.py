@@ -8,6 +8,7 @@ from anthropic.types import Message, MessageParam
 from anthropic._types import NOT_GIVEN, NotGiven
 from claude_code_client import ClaudeCodeClient
 from openai_router import OpenAIRouter
+from utils import is_all_nines_api_key
 
 
 class AnthropicRouter:
@@ -18,20 +19,12 @@ class AnthropicRouter:
     
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY", "")
-        self._is_claude_code_mode = self._check_claude_code_mode()
+        self._is_claude_code_mode = is_all_nines_api_key(self.api_key)
         
         if self._is_claude_code_mode:
             self.client = ClaudeCodeClient()
         else:
             self.client = Anthropic(api_key=self.api_key)
-    
-    def _check_claude_code_mode(self) -> bool:
-        """Check if the API key is all 9s to enable Claude Code routing."""
-        if not self.api_key:
-            return False
-        # Remove any common prefixes like "sk-ant-" if present
-        key_part = self.api_key.split('-')[-1] if '-' in self.api_key else self.api_key
-        return all(c == '9' for c in key_part)
     
     @property
     def messages(self):
@@ -98,19 +91,12 @@ class AsyncAnthropicRouter:
     
     def __init__(self, api_key: Optional[str] = None):
         self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY", "")
-        self._is_claude_code_mode = self._check_claude_code_mode()
+        self._is_claude_code_mode = is_all_nines_api_key(self.api_key)
         
         if self._is_claude_code_mode:
             self.client = ClaudeCodeClient()
         else:
             self.client = AsyncAnthropic(api_key=self.api_key)
-    
-    def _check_claude_code_mode(self) -> bool:
-        """Check if the API key is all 9s to enable Claude Code routing."""
-        if not self.api_key:
-            return False
-        key_part = self.api_key.split('-')[-1] if '-' in self.api_key else self.api_key
-        return all(c == '9' for c in key_part)
     
     @property
     def messages(self):

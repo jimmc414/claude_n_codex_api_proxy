@@ -26,7 +26,16 @@ logger = logging.getLogger(__name__)
 MAX_REQUEST_SIZE = 10 * 1024 * 1024  # 10MB max request size
 MAX_PROMPT_LENGTH = 100000  # Max characters in prompt
 ALLOWED_METHODS = {'GET', 'POST', 'OPTIONS'}
-ALLOWED_PATHS_REGEX = re.compile(r'^/v1/(messages|complete|models)/?.*$')
+# Allow only specific API endpoints while preventing traversal or unexpected paths
+# - /v1/messages
+# - /v1/complete
+# - /v1/chat/completions
+# - /v1/completions
+# - /v1/models or /v1/models/{model}
+# Optional query strings are permitted, but additional path segments are rejected
+ALLOWED_PATHS_REGEX = re.compile(
+    r'^/v1/(?:messages|complete|chat/completions|completions|models(?:/[A-Za-z0-9_.-]+)?)(?:\?.*)?$'
+)
 
 
 class AIInterceptor:

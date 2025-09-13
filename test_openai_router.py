@@ -11,7 +11,7 @@ def test_stop_sequences_passed_to_openai(monkeypatch):
 
         class Choice:
             def __init__(self):
-                self.message = {"content": "hello"}
+                self.message = type("Msg", (), {"content": "hello"})()
 
         choices = [Choice()]
 
@@ -53,7 +53,7 @@ def test_async_stop_sequences_passed_to_openai(monkeypatch):
 
         class Choice:
             def __init__(self):
-                self.message = {"content": "hello"}
+                self.message = type("Msg", (), {"content": "hello"})()
 
         choices = [Choice()]
 

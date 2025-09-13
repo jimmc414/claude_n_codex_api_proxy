@@ -20,7 +20,7 @@ def test_openai_message_list_content_conversion(monkeypatch):
             self.choices = [type("Choice", (), {"message": type("Msg", (), {"content": "ok"})()})]
             self.usage = type("Usage", (), {"prompt_tokens": 0, "completion_tokens": 0})()
 
-    def fake_create(*, model, messages, max_tokens, temperature=None):
+    def fake_create(*, model, messages, max_tokens, temperature=None, stop=None):
         captured["messages"] = messages
         return DummyResp()
 
@@ -44,7 +44,7 @@ async def test_openai_message_list_content_conversion_async(monkeypatch):
             self.choices = [type("Choice", (), {"message": type("Msg", (), {"content": "ok"})()})]
             self.usage = type("Usage", (), {"prompt_tokens": 0, "completion_tokens": 0})()
 
-    async def fake_create(*, model, messages, max_tokens, temperature=None):
+    async def fake_create(*, model, messages, max_tokens, temperature=None, stop=None):
         captured["messages"] = messages
         return DummyResp()
 

@@ -43,7 +43,11 @@ def main() -> None:
         cmd.extend(["--allowed-paths", args.allowed_paths])
     for pattern in args.allowed_path:
         cmd.extend(["--allowed-path", pattern])
-    subprocess.call(cmd)
+    try:
+        subprocess.check_call(cmd)
+    except subprocess.CalledProcessError as exc:
+        print(f"Proxy server exited with status {exc.returncode}", file=sys.stderr)
+        sys.exit(exc.returncode)
 
 
 if __name__ == "__main__":

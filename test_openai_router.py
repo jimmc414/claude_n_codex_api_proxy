@@ -210,7 +210,7 @@ def test_sampling_params_and_metadata_passed_to_openai(monkeypatch):
         metadata={"foo": "bar"},
     )
     assert captured["top_p"] == 0.9
-    assert captured["top_k"] == 40
+    assert "top_k" not in captured
     assert captured["metadata"] == {"foo": "bar"}
 
 
@@ -354,7 +354,7 @@ def test_async_sampling_params_and_metadata_passed_to_openai(monkeypatch):
 
     asyncio.run(run())
     assert captured["top_p"] == 0.9
-    assert captured["top_k"] == 40
+    assert "top_k" not in captured
     assert captured["metadata"] == {"foo": "bar"}
 
 

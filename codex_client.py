@@ -1,12 +1,9 @@
-"""
-Codex Client - Interface for routing API calls to Codex CLI
-"""
-import subprocess
-import asyncio
+"""Codex Client - Interface for routing API calls to Codex CLI"""
 from typing import Dict, List, Optional
 from datetime import datetime
 from anthropic.types import Message, TextBlock, Usage
 from claude_code_client import ClaudeCodeClient
+from utils import run_subprocess, run_subprocess_async
 
 
 class CodexClient(ClaudeCodeClient):
@@ -35,24 +32,7 @@ class CodexClient(ClaudeCodeClient):
                         cmd.extend(["--model", name])
                         break
 
-        try:
-            result = subprocess.run(
-                cmd,
-                input=prompt,
-                capture_output=True,
-                text=True,
-                timeout=120,
-            )
-            if result.returncode != 0:
-                error_msg = result.stderr or "Unknown error calling Codex"
-                raise Exception(f"Codex CLI error: {error_msg}")
-            return result.stdout.strip()
-        except subprocess.TimeoutExpired:
-            raise Exception("Codex CLI timed out after 120 seconds")
-        except FileNotFoundError:
-            raise Exception("Codex CLI not found. Please ensure 'codex' is installed and in PATH")
-        except Exception as e:
-            raise Exception(f"Error calling Codex: {str(e)}")
+        return run_subprocess(cmd, prompt, "Codex")
 
     def create_message(
         self,
@@ -104,30 +84,7 @@ class CodexClient(ClaudeCodeClient):
                         cmd.extend(["--model", name])
                         break
 
-        try:
-            proc = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            try:
-                stdout, stderr = await asyncio.wait_for(
-                    proc.communicate(input=prompt.encode()),
-                    timeout=120,
-                )
-            except asyncio.TimeoutError:
-                proc.kill()
-                await proc.communicate()
-                raise Exception("Codex CLI timed out after 120 seconds")
-            if proc.returncode != 0:
-                error_msg = stderr.decode() if stderr else "Unknown error calling Codex"
-                raise Exception(f"Codex CLI error: {error_msg}")
-            response_text = stdout.decode().strip()
-        except FileNotFoundError:
-            raise Exception("Codex CLI not found. Please ensure 'codex' is installed and in PATH")
-        except Exception as e:
-            raise Exception(f"Error calling Codex: {str(e)}")
+        response_text = await run_subprocess_async(cmd, prompt, "Codex")
 
         message = Message(
             id="msg_codex_" + datetime.now().strftime("%Y%m%d%H%M%S"),

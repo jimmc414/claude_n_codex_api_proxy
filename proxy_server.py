@@ -45,22 +45,17 @@ def build_allowed_paths_regex(patterns):
     return re.compile(combined)
 
 
-# Compiled regex used during request validation. This may be overridden at
-# runtime via environment variables or command-line options.
-ALLOWED_PATHS_REGEX = build_allowed_paths_regex(DEFAULT_ALLOWED_PATH_PATTERNS)
-
-
-
 class AIInterceptor:
     """
     Mitmproxy addon that intercepts Anthropic and OpenAI API calls and routes them
     to local CLIs when the API key is all 9s.
     """
 
-    def __init__(self, default_backend: str = "claude"):
+    def __init__(self, allowed_paths_regex: re.Pattern, default_backend: str = "claude"):
         self.claude_handler = ClaudeCodeProxyHandler()
         self.codex_handler = CodexProxyHandler()
         self.default_backend = default_backend
+        self.allowed_paths_regex = allowed_paths_regex
         self.stats = {
             'total_requests': 0,
             'claude_code_routed': 0,
@@ -103,7 +98,7 @@ class AIInterceptor:
             }
         
         # Check path
-        if not ALLOWED_PATHS_REGEX.match(flow.request.path):
+        if not self.allowed_paths_regex.match(flow.request.path):
             return {
                 "error": {
                     "type": "not_found",
@@ -409,7 +404,13 @@ class AIInterceptor:
         logger.info(f"  Errors: {self.stats['errors']}")
 
 
-async def start_proxy(host: str = "127.0.0.1", port: int = 8080, default_backend: str = "claude"):
+async def start_proxy(
+    host: str = "127.0.0.1",
+    port: int = 8080,
+    default_backend: str = "claude",
+    *,
+    allowed_paths_regex: re.Pattern,
+):
     """Start the mitmproxy server."""
     # Validate host and port
     if not re.match(r'^[\d.]+$|^localhost$|^[\da-fA-F:]+$', host):
@@ -426,7 +427,7 @@ async def start_proxy(host: str = "127.0.0.1", port: int = 8080, default_backend
 
     # Create master with our interceptor
     master = DumpMaster(opts)
-    master.addons.add(AIInterceptor(default_backend=default_backend))
+    master.addons.add(AIInterceptor(allowed_paths_regex, default_backend=default_backend))
 
     logger.info(f"""
 ╔══════════════════════════════════════════════════════════╗
@@ -477,11 +478,18 @@ def main():
         patterns = list(DEFAULT_ALLOWED_PATH_PATTERNS)
     if args.allowed_path:
         patterns.extend(args.allowed_path)
-    global ALLOWED_PATHS_REGEX
-    ALLOWED_PATHS_REGEX = build_allowed_paths_regex(patterns)
+
+    allowed_paths_regex = build_allowed_paths_regex(patterns)
 
     try:
-        asyncio.run(start_proxy(args.host, args.port, args.default_backend))
+        asyncio.run(
+            start_proxy(
+                args.host,
+                args.port,
+                args.default_backend,
+                allowed_paths_regex=allowed_paths_regex,
+            )
+        )
     except KeyboardInterrupt:
         logger.info("\nProxy server stopped.")
         sys.exit(0)

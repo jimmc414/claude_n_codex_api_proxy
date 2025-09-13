@@ -6,6 +6,7 @@ import os
 import subprocess
 import time
 import json
+import requests
 from anthropic import Anthropic
 import pytest
 

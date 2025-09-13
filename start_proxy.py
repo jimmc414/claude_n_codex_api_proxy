@@ -29,6 +29,9 @@ def main() -> None:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", default="8080")
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging")
+    parser.add_argument("--allowed-paths", help="Comma-separated regex patterns to replace default allowed paths")
+    parser.add_argument("--allowed-path", action="append", default=[],
+                        help="Additional regex pattern to allow")
     args = parser.parse_args()
 
     ensure_dependencies()
@@ -36,6 +39,10 @@ def main() -> None:
     cmd = [sys.executable, "proxy_server.py", "--host", args.host, "--port", args.port]
     if args.verbose:
         cmd.append("--verbose")
+    if args.allowed_paths:
+        cmd.extend(["--allowed-paths", args.allowed_paths])
+    for pattern in args.allowed_path:
+        cmd.extend(["--allowed-path", pattern])
     subprocess.call(cmd)
 
 

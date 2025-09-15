@@ -6,9 +6,6 @@ import logging
 import shutil
 import sys
 
-import proxy_server
-
-
 def command_exists(cmd: str) -> bool:
     """Check if a command exists on PATH."""
     return shutil.which(cmd) is not None
@@ -49,6 +46,8 @@ def main() -> None:
     args = parser.parse_args()
 
     ensure_dependencies()
+
+    import proxy_server
 
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)

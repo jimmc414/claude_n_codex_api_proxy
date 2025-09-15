@@ -15,6 +15,7 @@ from mitmproxy import http, options
 from mitmproxy.tools.dump import DumpMaster
 from claude_code_proxy_handler import ClaudeCodeProxyHandler
 from codex_proxy_handler import CodexProxyHandler
+from utils import is_all_nines_api_key
 
 # Configure logging
 logging.basicConfig(
@@ -68,15 +69,9 @@ class AIInterceptor:
     
     def _is_all_nines(self, api_key: str) -> bool:
         """Check if API key is all 9s (indicating Claude Code routing)."""
-        if not api_key or len(api_key) > 200:  # Sanity check on key length
+        if not api_key or len(api_key) > 200:
             return False
-        # Remove common prefixes safely
-        key_parts = api_key.split('-')
-        if len(key_parts) > 10:  # Prevent DoS with many splits
-            return False
-        key_part = key_parts[-1] if key_parts else api_key
-        # Check if all characters are 9s (limit check to prevent DoS)
-        return len(key_part) > 0 and len(key_part) < 100 and all(c == '9' for c in key_part)
+        return is_all_nines_api_key(api_key)
     
     def _is_anthropic_request(self, flow: http.HTTPFlow) -> bool:
         host = flow.request.pretty_host.lower()

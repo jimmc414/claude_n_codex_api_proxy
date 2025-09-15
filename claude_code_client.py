@@ -32,9 +32,13 @@ class ClaudeCodeClient:
         
         # Format conversation history
         for msg in messages:
-            role = msg.get("role", "")
-            content = msg.get("content", "")
-            
+            if isinstance(msg, dict):
+                role = msg.get("role", "")
+                content = msg.get("content", "")
+            else:
+                role = getattr(msg, "role", "")
+                content = getattr(msg, "content", "")
+
             # Handle different content types
             if isinstance(content, list):
                 # Handle multipart messages
@@ -44,7 +48,10 @@ class ClaudeCodeClient:
                         if part.get("type") == "text":
                             text_parts.append(part.get("text", ""))
                     else:
-                        text_parts.append(str(part))
+                        if getattr(part, "type", None) == "text":
+                            text_parts.append(getattr(part, "text", ""))
+                        else:
+                            text_parts.append(str(part))
                 content = " ".join(text_parts)
             
             if role == "user":

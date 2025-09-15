@@ -7,7 +7,6 @@ from anthropic import Anthropic, AsyncAnthropic
 from anthropic.types import Message, MessageParam
 from anthropic._types import NOT_GIVEN, NotGiven
 from claude_code_client import ClaudeCodeClient
-from openai_router import OpenAIRouter
 from utils import is_all_nines_api_key
 
 
@@ -184,5 +183,6 @@ def create_client(
         )
 
     if selected in {"codex", "openai"}:
+        from openai_router import OpenAIRouter
         return OpenAIRouter(api_key=api_key)
     return AnthropicRouter(api_key=api_key)

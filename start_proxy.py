@@ -18,6 +18,8 @@ def ensure_dependencies() -> None:
     """Verify required dependencies are available, installing if needed."""
     if not command_exists("claude"):
         print("⚠️  Warning: Claude Code CLI not found; local routing will fail.")
+    if not command_exists("codex"):
+        print("⚠️  Warning: Codex CLI not found; codex routing will fail.")
 
     try:
         import mitmproxy  # noqa: F401

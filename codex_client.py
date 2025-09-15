@@ -19,10 +19,9 @@ class CodexClient(ClaudeCodeClient):
         super().__init__()
         self.claude_command = "codex"
 
-    def _call_claude_cli(self, prompt: str, model: Optional[str] = None) -> str:
-        """Call Codex CLI with the formatted prompt."""
+    def _build_codex_cmd(self, model: Optional[str] = None) -> List[str]:
+        """Build the Codex CLI command with model normalization."""
         cmd = [self.claude_command, "--print"]
-
         if model:
             model_map = {
                 "code-davinci-002": "davinci",
@@ -37,7 +36,11 @@ class CodexClient(ClaudeCodeClient):
                     if name in model.lower():
                         cmd.extend(["--model", name])
                         break
+        return cmd
 
+    def _call_claude_cli(self, prompt: str, model: Optional[str] = None) -> str:
+        """Call Codex CLI with the formatted prompt."""
+        cmd = self._build_codex_cmd(model)
         try:
             return run_subprocess(cmd, prompt, "Codex")
         except (CLINotFoundError, CLITimeoutError, CLIError):
@@ -76,23 +79,7 @@ class CodexClient(ClaudeCodeClient):
             raise NotImplementedError("Streaming is not yet supported with Codex routing")
 
         prompt = self._format_messages_for_claude(messages, system)
-
-        cmd = [self.claude_command, "--print"]
-        if model:
-            model_map = {
-                "code-davinci-002": "davinci",
-                "code-cushman-001": "cushman",
-            }
-            for full_name, short_name in model_map.items():
-                if full_name in model:
-                    cmd.extend(["--model", short_name])
-                    break
-            else:
-                for name in ["davinci", "cushman"]:
-                    if name in model.lower():
-                        cmd.extend(["--model", name])
-                        break
-
+        cmd = self._build_codex_cmd(model)
         try:
             response_text = await run_subprocess_async(cmd, prompt, "Codex")
         except (CLINotFoundError, CLITimeoutError, CLIError):

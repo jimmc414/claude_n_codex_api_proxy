@@ -1,6 +1,6 @@
 import asyncio
 import subprocess
-from typing import List, Optional
+from typing import Optional, List
 
 
 class CLIError(Exception):

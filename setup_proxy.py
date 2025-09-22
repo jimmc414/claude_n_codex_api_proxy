@@ -6,6 +6,7 @@ Generates certificates and provides configuration instructions.
 import os
 import sys
 import subprocess
+import time
 import platform
 from pathlib import Path
 
@@ -80,13 +81,46 @@ def generate_certificates():
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE
             )
-            proc.terminate()
-            proc.wait(timeout=5)
-            print(f"  ✅ CA certificate generated at {ca_cert}")
         except Exception as e:
             print(f"  ⚠️  Could not auto-generate certificate: {e}")
             print("  Run 'mitmdump' once manually to generate certificates")
-    
+        else:
+            try:
+                deadline = time.monotonic() + 10
+                success = False
+
+                while time.monotonic() < deadline:
+                    if ca_cert.exists():
+                        success = True
+                        break
+
+                    if proc.poll() is not None:
+                        break
+
+                    time.sleep(0.1)
+
+                proc_returncode = proc.poll()
+
+                if success or ca_cert.exists():
+                    print(f"  ✅ CA certificate generated at {ca_cert}")
+                else:
+                    reason = "timed out waiting for mitmdump to create CA certificate"
+                    if proc_returncode is not None:
+                        reason = (
+                            "mitmdump exited "
+                            f"with code {proc_returncode} before creating CA certificate"
+                        )
+                    print(f"  ⚠️  Could not auto-generate certificate: {reason}")
+                    print("  Run 'mitmdump' once manually to generate certificates")
+            finally:
+                if proc.poll() is None:
+                    proc.terminate()
+                    try:
+                        proc.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        proc.kill()
+                        proc.wait(timeout=5)
+
     return cert_dir
 
 

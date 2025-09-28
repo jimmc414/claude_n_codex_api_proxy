@@ -147,6 +147,15 @@ Run the examples:
 python example.py
 ```
 
+### Planning a Migration Away From Cloud API Keys?
+
+If you need to adapt an existing application so it can call Claude Code or Codex
+directly via the locally installed CLIs (e.g., Claude Max or ChatGPT Pro
+subscriptions), read [`docs/direct_llm_integration.md`](docs/direct_llm_integration.md).
+The guide explains how the proxy works, what preconditions must hold, and how to
+translate API payloads into CLI prompts and back without ever storing API keys
+in your codebase.
+
 ## Testing
 
 Run the test suite to verify the routing works correctly:

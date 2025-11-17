@@ -56,6 +56,10 @@ class MessagesRouter:
         """
         Create a message completion, routing to Claude Code if appropriate.
         """
+        # Validate messages early
+        if not messages:
+            raise ValueError("Messages array cannot be empty")
+
         if self.is_claude_code:
             # Route to Claude Code
             return self.router.client.create_message(
@@ -128,6 +132,10 @@ class AsyncMessagesRouter:
         """
         Create a message completion, routing to Claude Code if appropriate.
         """
+        # Validate messages early
+        if not messages:
+            raise ValueError("Messages array cannot be empty")
+
         if self.is_claude_code:
             # Route to Claude Code (async wrapper around sync call)
             return await self.router.client.acreate_message(

@@ -24,8 +24,12 @@ class ClaudeCodeClient:
         """
         Format messages into a single prompt for Claude Code CLI.
         """
+        # Validate messages is not empty
+        if not messages:
+            raise ValueError("Messages array cannot be empty")
+
         prompt_parts = []
-        
+
         # Add system prompt if provided
         if system:
             prompt_parts.append(f"System: {system}\n")
@@ -61,11 +65,15 @@ class ClaudeCodeClient:
         
         # Join all parts
         full_prompt = "\n\n".join(prompt_parts)
-        
+
+        # Validate we have actual content
+        if not full_prompt.strip():
+            raise ValueError("Cannot create prompt from empty messages")
+
         # Add final Human/Assistant markers if needed
         if not full_prompt.strip().endswith("Assistant:"):
             full_prompt += "\n\nAssistant:"
-        
+
         return full_prompt
     
     def _call_claude_cli(self, prompt: str, model: Optional[str] = None) -> str:
@@ -116,6 +124,10 @@ class ClaudeCodeClient:
         """
         if stream:
             raise NotImplementedError("Streaming is not yet supported with Claude Code routing")
+
+        # Validate messages early
+        if not messages:
+            raise ValueError("Messages array cannot be empty")
         
         # Format the prompt for Claude Code
         prompt = self._format_messages_for_claude(messages, system)
@@ -156,6 +168,10 @@ class ClaudeCodeClient:
         """
         if stream:
             raise NotImplementedError("Streaming is not yet supported with Claude Code routing")
+
+        # Validate messages early
+        if not messages:
+            raise ValueError("Messages array cannot be empty")
         
         # Format the prompt for Claude Code
         prompt = self._format_messages_for_claude(messages, system)

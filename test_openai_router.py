@@ -211,7 +211,8 @@ def test_sampling_params_and_metadata_passed_to_openai(monkeypatch):
     )
     assert captured["top_p"] == 0.9
     assert "top_k" not in captured
-    assert captured["metadata"] == {"foo": "bar"}
+    # metadata is Anthropic-specific and should not be passed to OpenAI API
+    assert "metadata" not in captured
 
 
 def test_async_stream_passed_to_openai(monkeypatch):
@@ -355,7 +356,8 @@ def test_async_sampling_params_and_metadata_passed_to_openai(monkeypatch):
     asyncio.run(run())
     assert captured["top_p"] == 0.9
     assert "top_k" not in captured
-    assert captured["metadata"] == {"foo": "bar"}
+    # metadata is Anthropic-specific and should not be passed to OpenAI API
+    assert "metadata" not in captured
 
 
 def test_dict_content_normalization(monkeypatch):

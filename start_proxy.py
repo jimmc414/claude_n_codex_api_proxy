@@ -13,10 +13,20 @@ def command_exists(cmd: str) -> bool:
 
 def ensure_dependencies() -> None:
     """Verify required dependencies are available, installing if needed."""
+    cli_missing = []
     if not command_exists("claude"):
         print("⚠️  Warning: Claude Code CLI not found; local routing will fail.")
+        print("   Install with: npm install -g @anthropics/claude-code")
+        cli_missing.append("claude")
     if not command_exists("codex"):
         print("⚠️  Warning: Codex CLI not found; codex routing will fail.")
+        print("   See https://github.com/openai/openai-codex for installation")
+        cli_missing.append("codex")
+
+    if cli_missing:
+        print(f"\n⚠️  Missing CLI tools: {', '.join(cli_missing)}")
+        print("   The proxy will start but requests with API key '999...' will fail")
+        print("   until these tools are installed.\n")
 
     try:
         import mitmproxy  # noqa: F401

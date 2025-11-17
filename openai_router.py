@@ -63,6 +63,10 @@ class MessagesRouter:
         top_p: Union[float, NotGiven] = NOT_GIVEN,
         **kwargs,
         ) -> Message:
+        # Validate messages early
+        if not messages:
+            raise ValueError("Messages array cannot be empty")
+
         if self.is_codex:
             if stream is not NOT_GIVEN and stream:
                 raise NotImplementedError("Streaming is not yet supported when routing to Codex")
@@ -87,16 +91,16 @@ class MessagesRouter:
                         "content": content,
                     }
                 )
+            # Note: metadata is Anthropic-specific and not supported by OpenAI API
+            # top_k is also not supported by OpenAI API; both are ignored when routing
             response = self.router.client.chat.completions.create(
                 model=model,
                 messages=openai_messages,
                 max_tokens=max_tokens,
                 temperature=temperature if temperature is not NOT_GIVEN else None,
                 top_p=top_p if top_p is not NOT_GIVEN else None,
-                # top_k is not supported by the OpenAI API; ignore it when routing here
                 stop=stop_sequences if stop_sequences is not NOT_GIVEN else None,
                 stream=stream if stream is not NOT_GIVEN else False,
-                metadata=metadata if metadata is not NOT_GIVEN else None,
                 **kwargs,
             )
             if stream is not NOT_GIVEN and stream:
@@ -176,6 +180,10 @@ class AsyncMessagesRouter:
         top_p: Union[float, NotGiven] = NOT_GIVEN,
         **kwargs,
     ) -> Message:
+        # Validate messages early
+        if not messages:
+            raise ValueError("Messages array cannot be empty")
+
         if self.is_codex:
             if stream is not NOT_GIVEN and stream:
                 raise NotImplementedError("Streaming is not yet supported when routing to Codex")
@@ -200,16 +208,16 @@ class AsyncMessagesRouter:
                         "content": content,
                     }
                 )
+            # Note: metadata is Anthropic-specific and not supported by OpenAI API
+            # top_k is also not supported by OpenAI API; both are ignored when routing
             response = await self.router.client.chat.completions.create(
                 model=model,
                 messages=openai_messages,
                 max_tokens=max_tokens,
                 temperature=temperature if temperature is not NOT_GIVEN else None,
                 top_p=top_p if top_p is not NOT_GIVEN else None,
-                # top_k is not supported by the OpenAI API; ignore it when routing here
                 stop=stop_sequences if stop_sequences is not NOT_GIVEN else None,
                 stream=stream if stream is not NOT_GIVEN else False,
-                metadata=metadata if metadata is not NOT_GIVEN else None,
                 **kwargs,
             )
             if stream is not NOT_GIVEN and stream:

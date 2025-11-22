@@ -5,6 +5,7 @@ import asyncio
 import logging
 import shutil
 import sys
+from pathlib import Path
 
 def command_exists(cmd: str) -> bool:
     """Check if a command exists on PATH."""
@@ -20,11 +21,20 @@ def ensure_dependencies() -> None:
 
     try:
         import mitmproxy  # noqa: F401
-    except Exception:
+    except ImportError:
         import subprocess
 
         print("Installing Python dependencies...")
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", "requirements.txt"])
+        # Use absolute path to requirements.txt
+        script_dir = Path(__file__).parent
+        req_file = script_dir / "requirements.txt"
+        try:
+            subprocess.check_call([sys.executable, "-m", "pip", "install", "-r", str(req_file)])
+            print("✅ Dependencies installed. Please run the script again to start the proxy.")
+            sys.exit(0)
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Failed to install dependencies: {e}")
+            sys.exit(1)
 
 
 
@@ -33,6 +43,12 @@ def main() -> None:
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging")
+    parser.add_argument(
+        "--default-backend",
+        choices=["claude", "codex"],
+        default="claude",
+        help="Default local backend when API key is all 9s (default: claude)",
+    )
     parser.add_argument(
         "--allowed-paths",
         help="Comma-separated regex patterns to replace default allowed paths",
@@ -66,6 +82,7 @@ def main() -> None:
             proxy_server.start_proxy(
                 args.host,
                 args.port,
+                args.default_backend,
                 allowed_paths_regex=allowed_paths_regex,
             )
         )

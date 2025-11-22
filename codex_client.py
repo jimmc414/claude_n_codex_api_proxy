@@ -55,15 +55,32 @@ class CodexClient(ClaudeCodeClient):
         temperature: Optional[float] = None,
         stream: bool = False,
     ) -> Message:
-        message = super().create_message(
-            messages=messages,
+        if stream:
+            raise NotImplementedError("Streaming is not yet supported with Codex routing")
+
+        # Format the prompt for Codex
+        prompt = self._format_messages_for_claude(messages, system)
+
+        # Call Codex CLI
+        response_text = self._call_claude_cli(prompt, model)
+
+        # Create a Message object with Codex-specific ID
+        message = Message(
+            id="msg_codex_" + datetime.now().strftime("%Y%m%d%H%M%S"),
+            content=[TextBlock(text=response_text, type="text")],
             model=model,
-            max_tokens=max_tokens,
-            system=system,
-            temperature=temperature,
-            stream=stream,
+            role="assistant",
+            stop_reason="end_turn",
+            stop_sequence=None,
+            type="message",
+            usage=Usage(
+                input_tokens=len(prompt.split()),  # Rough estimate
+                output_tokens=len(response_text.split()),  # Rough estimate
+                cache_creation_input_tokens=None,
+                cache_read_input_tokens=None
+            )
         )
-        message.id = "msg_codex_" + datetime.now().strftime("%Y%m%d%H%M%S")
+
         return message
 
     async def acreate_message(

@@ -94,9 +94,9 @@ class MessagesRouter:
                 temperature=temperature if temperature is not NOT_GIVEN else None,
                 top_p=top_p if top_p is not NOT_GIVEN else None,
                 # top_k is not supported by the OpenAI API; ignore it when routing here
+                # metadata is also not supported by OpenAI API; ignore it when routing here
                 stop=stop_sequences if stop_sequences is not NOT_GIVEN else None,
                 stream=stream if stream is not NOT_GIVEN else False,
-                metadata=metadata if metadata is not NOT_GIVEN else None,
                 **kwargs,
             )
             if stream is not NOT_GIVEN and stream:
@@ -120,7 +120,9 @@ class MessagesRouter:
                 usage = usage or getattr(final, "usage", None)
                 response_id = getattr(final, "id", "")
             else:
-                text = response.choices[0].message.content
+                if not response.choices:
+                    raise RuntimeError("No choices returned from OpenAI API")
+                text = response.choices[0].message.content or ""
                 usage = response.usage
                 response_id = response.id
             return Message(
@@ -207,9 +209,9 @@ class AsyncMessagesRouter:
                 temperature=temperature if temperature is not NOT_GIVEN else None,
                 top_p=top_p if top_p is not NOT_GIVEN else None,
                 # top_k is not supported by the OpenAI API; ignore it when routing here
+                # metadata is also not supported by OpenAI API; ignore it when routing here
                 stop=stop_sequences if stop_sequences is not NOT_GIVEN else None,
                 stream=stream if stream is not NOT_GIVEN else False,
-                metadata=metadata if metadata is not NOT_GIVEN else None,
                 **kwargs,
             )
             if stream is not NOT_GIVEN and stream:
@@ -233,7 +235,9 @@ class AsyncMessagesRouter:
                 usage = usage or getattr(final, "usage", None)
                 response_id = getattr(final, "id", "")
             else:
-                text = response.choices[0].message.content
+                if not response.choices:
+                    raise RuntimeError("No choices returned from OpenAI API")
+                text = response.choices[0].message.content or ""
                 usage = response.usage
                 response_id = response.id
             return Message(

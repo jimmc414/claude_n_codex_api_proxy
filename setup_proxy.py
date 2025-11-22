@@ -239,7 +239,13 @@ else:
     
     with open('test_proxy.py', 'w') as f:
         f.write(test_script)
-    os.chmod('test_proxy.py', 0o755)
+
+    # Make executable on Unix-like systems (Windows doesn't support this)
+    try:
+        os.chmod('test_proxy.py', 0o755)
+    except (OSError, NotImplementedError):
+        pass  # Windows doesn't support Unix-style permissions
+
     print("\n✅ Created test_proxy.py - run it after starting the proxy")
 
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Universal HTTP/HTTPS Proxy Server for Anthropic and OpenAI API interception.
-Routes to Claude Code or Codex when API keys are all 9s.
+Universal HTTP/HTTPS Proxy Server for Anthropic, OpenAI, and Gemini API interception.
+Routes to Claude Code, Codex, or Gemini CLI when API keys are all 9s.
 Includes security improvements and bug fixes.
 """
 import asyncio
@@ -14,6 +14,7 @@ from mitmproxy import http, options
 from mitmproxy.tools.dump import DumpMaster
 from claude_code_proxy_handler import ClaudeCodeProxyHandler
 from codex_proxy_handler import CodexProxyHandler
+from gemini_proxy_handler import GeminiProxyHandler
 
 # Configure logging
 logging.basicConfig(
@@ -26,31 +27,35 @@ logger = logging.getLogger(__name__)
 MAX_REQUEST_SIZE = 10 * 1024 * 1024  # 10MB max request size
 MAX_PROMPT_LENGTH = 100000  # Max characters in prompt
 ALLOWED_METHODS = {'GET', 'POST', 'OPTIONS'}
-ALLOWED_PATHS_REGEX = re.compile(r'^/v1/(messages|complete|models)/?.*$')
+# Updated regex to include Gemini paths
+ALLOWED_PATHS_REGEX = re.compile(r'^/(v1|v1beta)/(messages|complete|models).*$')
 
 
 class AIInterceptor:
     """
-    Mitmproxy addon that intercepts Anthropic and OpenAI API calls and routes them
+    Mitmproxy addon that intercepts AI API calls and routes them
     to local CLIs when the API key is all 9s.
     """
 
     def __init__(self, default_backend: str = "claude"):
         self.claude_handler = ClaudeCodeProxyHandler()
         self.codex_handler = CodexProxyHandler()
+        self.gemini_handler = GeminiProxyHandler()
         self.default_backend = default_backend
         self.stats = {
             'total_requests': 0,
             'claude_code_routed': 0,
             'codex_routed': 0,
+            'gemini_routed': 0,
             'anthropic_forwarded': 0,
             'openai_forwarded': 0,
+            'gemini_forwarded': 0,
             'errors': 0,
             'blocked_requests': 0
         }
     
     def _is_all_nines(self, api_key: str) -> bool:
-        """Check if API key is all 9s (indicating Claude Code routing)."""
+        """Check if API key is all 9s."""
         if not api_key or len(api_key) > 200:  # Sanity check on key length
             return False
         # Remove common prefixes safely
@@ -68,6 +73,10 @@ class AIInterceptor:
     def _is_openai_request(self, flow: http.HTTPFlow) -> bool:
         host = flow.request.pretty_host.lower()
         return host in ['api.openai.com', 'openai.com']
+
+    def _is_gemini_request(self, flow: http.HTTPFlow) -> bool:
+        host = flow.request.pretty_host.lower()
+        return host in ['generativelanguage.googleapis.com']
     
     def _validate_request(self, flow: http.HTTPFlow) -> Optional[Dict[str, Any]]:
         """Validate and sanitize the request."""
@@ -104,7 +113,9 @@ class AIInterceptor:
         """Handle intercepted HTTP requests."""
         is_anthropic = self._is_anthropic_request(flow)
         is_openai = self._is_openai_request(flow)
-        if not (is_anthropic or is_openai):
+        is_gemini = self._is_gemini_request(flow)
+        
+        if not (is_anthropic or is_openai or is_gemini):
             return
 
         self.stats['total_requests'] += 1
@@ -120,21 +131,32 @@ class AIInterceptor:
             )
             return
         
-        # Extract API key from headers (with size limits)
+        # Extract API key
         api_key = ''
-        x_api_key = flow.request.headers.get('x-api-key', '')
-        if x_api_key and len(x_api_key) < 500:
-            api_key = x_api_key
-        
-        if not api_key:
-            # Try Authorization header as fallback
-            auth_header = flow.request.headers.get('authorization', '')
-            if auth_header and len(auth_header) < 500 and auth_header.startswith('Bearer '):
-                api_key = auth_header[7:]
+        if is_gemini:
+            # Check query param 'key' first, then header x-goog-api-key
+            api_key = flow.request.query.get('key', '')
+            if not api_key:
+                api_key = flow.request.headers.get('x-goog-api-key', '')
+        else:
+            # Existing logic for Anthropic/OpenAI
+            x_api_key = flow.request.headers.get('x-api-key', '')
+            if x_api_key and len(x_api_key) < 500:
+                api_key = x_api_key
+            
+            if not api_key:
+                # Try Authorization header as fallback
+                auth_header = flow.request.headers.get('authorization', '')
+                if auth_header and len(auth_header) < 500 and auth_header.startswith('Bearer '):
+                    api_key = auth_header[7:]
         
         # Determine routing based on API key and host
         if self._is_all_nines(api_key):
-            if is_openai or (not is_anthropic and self.default_backend == 'codex'):
+            if is_gemini:
+                logger.info(f"🔀 Routing to Gemini CLI: {flow.request.method} {flow.request.path}")
+                self.stats['gemini_routed'] += 1
+                await self._handle_gemini_request(flow)
+            elif is_openai or (not is_anthropic and self.default_backend == 'codex'):
                 logger.info(f"🔀 Routing to Codex: {flow.request.method} {flow.request.path}")
                 self.stats['codex_routed'] += 1
                 await self._handle_codex_request(flow)
@@ -143,7 +165,10 @@ class AIInterceptor:
                 self.stats['claude_code_routed'] += 1
                 await self._handle_claude_code_request(flow)
         else:
-            if is_openai:
+            if is_gemini:
+                logger.info(f"➡️  Forwarding to Google API: {flow.request.method} {flow.request.path}")
+                self.stats['gemini_forwarded'] += 1
+            elif is_openai:
                 logger.info(f"➡️  Forwarding to OpenAI API: {flow.request.method} {flow.request.path}")
                 self.stats['openai_forwarded'] += 1
             else:
@@ -151,17 +176,16 @@ class AIInterceptor:
                 self.stats['anthropic_forwarded'] += 1
             # Let the request pass through upstream
     
-    async def _handle_claude_code_request(self, flow: http.HTTPFlow) -> None:
-        """Route the request to Claude Code and return the response."""
+    async def _handle_gemini_request(self, flow: http.HTTPFlow) -> None:
+        """Route the request to Gemini CLI and return the response."""
         try:
-            # Parse request body with size check
             request_data = {}
             if flow.request.content:
                 if len(flow.request.content) > MAX_REQUEST_SIZE:
                     flow.response = http.Response.make(
                         413,
-                        json.dumps({"error": {"type": "request_too_large", "message": "Request body too large"}}),
-                        {"Content-Type": "application/json"}
+                        json.dumps({"error": {"code": 413, "message": "Request body too large", "status": "INVALID_ARGUMENT"}})
+                        ,{"Content-Type": "application/json"}
                     )
                     return
                 
@@ -172,8 +196,73 @@ class AIInterceptor:
                     logger.error(f"Failed to parse request: {e}")
                     flow.response = http.Response.make(
                         400,
-                        json.dumps({"error": {"type": "invalid_request", "message": "Invalid JSON in request body"}}),
-                        {"Content-Type": "application/json"}
+                        json.dumps({"error": {"code": 400, "message": "Invalid JSON in request body", "status": "INVALID_ARGUMENT"}})
+                        ,{"Content-Type": "application/json"}
+                    )
+                    return
+            
+            if not isinstance(request_data, dict):
+                flow.response = http.Response.make(
+                    400,
+                    json.dumps({"error": {"code": 400, "message": "Request body must be a JSON object", "status": "INVALID_ARGUMENT"}})
+                    ,{"Content-Type": "application/json"}
+                )
+                return
+            
+            # Route to handler
+            response_data = await self.gemini_handler.handle_generate_content_request(
+                request_data,
+                flow.request.method,
+                flow.request.path
+            )
+            
+            # Determine status code
+            status_code = 200
+            if 'error' in response_data:
+                status_code = response_data['error'].get('code', 500)
+                
+            response_json = json.dumps(response_data)
+            flow.response = http.Response.make(
+                status_code,
+                response_json,
+                {
+                    "Content-Type": "application/json",
+                    "Content-Length": str(len(response_json))
+                }
+            )
+            
+        except Exception as e:
+            logger.error(f"Error handling Gemini request: {e}", exc_info=True)
+            self.stats['errors'] += 1
+            flow.response = http.Response.make(
+                500,
+                json.dumps({"error": {"code": 500, "message": "Internal proxy error", "status": "INTERNAL"}})
+                ,{"Content-Type": "application/json"}
+            )
+
+    async def _handle_claude_code_request(self, flow: http.HTTPFlow) -> None:
+        """Route the request to Claude Code and return the response."""
+        try:
+            # Parse request body with size check
+            request_data = {}
+            if flow.request.content:
+                if len(flow.request.content) > MAX_REQUEST_SIZE:
+                    flow.response = http.Response.make(
+                        413,
+                        json.dumps({"error": {"type": "request_too_large", "message": "Request body too large"}})
+                        ,{"Content-Type": "application/json"}
+                    )
+                    return
+                
+                try:
+                    content_str = flow.request.content.decode('utf-8', errors='ignore')
+                    request_data = json.loads(content_str)
+                except (json.JSONDecodeError, UnicodeDecodeError) as e:
+                    logger.error(f"Failed to parse request: {e}")
+                    flow.response = http.Response.make(
+                        400,
+                        json.dumps({"error": {"type": "invalid_request", "message": "Invalid JSON in request body"}})
+                        ,{"Content-Type": "application/json"}
                     )
                     return
             
@@ -181,8 +270,8 @@ class AIInterceptor:
             if not isinstance(request_data, dict):
                 flow.response = http.Response.make(
                     400,
-                    json.dumps({"error": {"type": "invalid_request", "message": "Request body must be a JSON object"}}),
-                    {"Content-Type": "application/json"}
+                    json.dumps({"error": {"type": "invalid_request", "message": "Request body must be a JSON object"}})
+                    ,{"Content-Type": "application/json"}
                 )
                 return
             
@@ -249,8 +338,8 @@ class AIInterceptor:
             self.stats['errors'] += 1
             flow.response = http.Response.make(
                 504,
-                json.dumps({"error": {"type": "timeout_error", "message": "Request timed out"}}),
-                {"Content-Type": "application/json"}
+                json.dumps({"error": {"type": "timeout_error", "message": "Request timed out"}})
+                ,{"Content-Type": "application/json"}
             )
         except Exception as e:
             logger.error(f"Error handling Claude Code request: {e}", exc_info=True)
@@ -258,8 +347,8 @@ class AIInterceptor:
             # Don't expose internal error details
             flow.response = http.Response.make(
                 500,
-                json.dumps({"error": {"type": "internal_error", "message": "An internal error occurred"}}),
-                {"Content-Type": "application/json"}
+                json.dumps({"error": {"type": "internal_error", "message": "An internal error occurred"}})
+                ,{"Content-Type": "application/json"}
             )
 
 
@@ -271,8 +360,8 @@ class AIInterceptor:
                 if len(flow.request.content) > MAX_REQUEST_SIZE:
                     flow.response = http.Response.make(
                         413,
-                        json.dumps({"error": {"type": "request_too_large", "message": "Request body too large"}}),
-                        {"Content-Type": "application/json"},
+                        json.dumps({"error": {"type": "request_too_large", "message": "Request body too large"}})
+                        ,{"Content-Type": "application/json"},
                     )
                     return
                 try:
@@ -282,16 +371,16 @@ class AIInterceptor:
                     logger.error(f"Failed to parse request: {e}")
                     flow.response = http.Response.make(
                         400,
-                        json.dumps({"error": {"type": "invalid_request", "message": "Invalid JSON in request body"}}),
-                        {"Content-Type": "application/json"},
+                        json.dumps({"error": {"type": "invalid_request", "message": "Invalid JSON in request body"}})
+                        ,{"Content-Type": "application/json"},
                     )
                     return
     
             if not isinstance(request_data, dict):
                 flow.response = http.Response.make(
                     400,
-                    json.dumps({"error": {"type": "invalid_request", "message": "Request body must be a JSON object"}}),
-                    {"Content-Type": "application/json"},
+                    json.dumps({"error": {"type": "invalid_request", "message": "Request body must be a JSON object"}})
+                    ,{"Content-Type": "application/json"},
                 )
                 return
     
@@ -351,20 +440,26 @@ class AIInterceptor:
             self.stats['errors'] += 1
             flow.response = http.Response.make(
                 504,
-                json.dumps({"error": {"type": "timeout_error", "message": "Request timed out"}}),
-                {"Content-Type": "application/json"},
+                json.dumps({"error": {"type": "timeout_error", "message": "Request timed out"}})
+                ,{"Content-Type": "application/json"},
             )
         except Exception as e:
             logger.error(f"Error handling Codex request: {e}", exc_info=True)
             self.stats['errors'] += 1
             flow.response = http.Response.make(
                 500,
-                json.dumps({"error": {"type": "internal_error", "message": "An internal error occurred"}}),
-                {"Content-Type": "application/json"},
+                json.dumps({"error": {"type": "internal_error", "message": "An internal error occurred"}})
+                ,{"Content-Type": "application/json"},
             )
+
     def response(self, flow: http.HTTPFlow) -> None:
         """Handle responses (for logging/stats)."""
-        if (self._is_anthropic_request(flow) or self._is_openai_request(flow)) and flow.response:
+        is_tracked = (
+            self._is_anthropic_request(flow) or 
+            self._is_openai_request(flow) or 
+            self._is_gemini_request(flow)
+        )
+        if is_tracked and flow.response:
             status = flow.response.status_code
             if status >= 400:
                 self.stats['errors'] += 1
@@ -379,8 +474,10 @@ class AIInterceptor:
         logger.info(f"  Total requests: {self.stats['total_requests']}")
         logger.info(f"  Routed to Claude Code: {self.stats['claude_code_routed']}")
         logger.info(f"  Routed to Codex: {self.stats['codex_routed']}")
+        logger.info(f"  Routed to Gemini: {self.stats['gemini_routed']}")
         logger.info(f"  Forwarded to Anthropic: {self.stats['anthropic_forwarded']}")
         logger.info(f"  Forwarded to OpenAI: {self.stats['openai_forwarded']}")
+        logger.info(f"  Forwarded to Gemini: {self.stats['gemini_forwarded']}")
         logger.info(f"  Blocked requests: {self.stats['blocked_requests']}")
         logger.info(f"  Errors: {self.stats['errors']}")
 
@@ -388,7 +485,7 @@ class AIInterceptor:
 async def start_proxy(host: str = "127.0.0.1", port: int = 8080, default_backend: str = "claude"):
     """Start the mitmproxy server."""
     # Validate host and port
-    if not re.match(r'^[\d.]+$|^localhost$|^[\da-fA-F:]+$', host):
+    if not re.match(r'^[\\d.]+$|^localhost$|^[\\da-fA-F:]+$', host):
         raise ValueError(f"Invalid host: {host}")
     if not 1 <= port <= 65535:
         raise ValueError(f"Invalid port: {port}")

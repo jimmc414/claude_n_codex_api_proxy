@@ -10,6 +10,12 @@ from datetime import datetime
 import uuid
 import logging
 import re
+from utils import (
+    run_subprocess_async,
+    CLINotFoundError,
+    CLITimeoutError,
+    CLIError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -199,11 +205,26 @@ class ClaudeCodeProxyHandler:
             
             return response
             
-        except asyncio.TimeoutError:
+        except CLINotFoundError as e:
+            return {
+                "error": {
+                    "type": "not_found_error",
+                    "message": str(e),
+                }
+            }
+        except CLITimeoutError as e:
             return {
                 "error": {
                     "type": "timeout_error",
-                    "message": "Request timed out"
+                    "message": str(e),
+                }
+            }
+        except CLIError as e:
+            logger.error(f"Error handling messages request: {e}", exc_info=True)
+            return {
+                "error": {
+                    "type": "api_error",
+                    "message": str(e),
                 }
             }
         except Exception as e:
@@ -211,7 +232,7 @@ class ClaudeCodeProxyHandler:
             return {
                 "error": {
                     "type": "api_error",
-                    "message": "Failed to process request"
+                    "message": "Failed to process request",
                 }
             }
     
@@ -298,11 +319,26 @@ class ClaudeCodeProxyHandler:
             
             return response
             
-        except asyncio.TimeoutError:
+        except CLINotFoundError as e:
+            return {
+                "error": {
+                    "type": "not_found_error",
+                    "message": str(e),
+                }
+            }
+        except CLITimeoutError as e:
             return {
                 "error": {
                     "type": "timeout_error",
-                    "message": "Request timed out"
+                    "message": str(e),
+                }
+            }
+        except CLIError as e:
+            logger.error(f"Error handling complete request: {e}", exc_info=True)
+            return {
+                "error": {
+                    "type": "api_error",
+                    "message": str(e),
                 }
             }
         except Exception as e:
@@ -310,7 +346,7 @@ class ClaudeCodeProxyHandler:
             return {
                 "error": {
                     "type": "api_error",
-                    "message": "Failed to process request"
+                    "message": "Failed to process request",
                 }
             }
     
@@ -414,45 +450,24 @@ class ClaudeCodeProxyHandler:
         logger.debug(f"Running Claude CLI with model: {model}")
         
         try:
-            # Run Claude Code CLI asynchronously with stdin for prompt
-            proc = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+            response_text = await run_subprocess_async(
+                cmd, prompt, "Claude Code", include_stderr=False
             )
-            
-            # Send prompt via stdin and wait for completion with timeout
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(input=prompt.encode('utf-8')),
-                timeout=120  # 2 minute timeout
-            )
-            
-            if proc.returncode != 0:
-                error_msg = stderr.decode('utf-8', errors='ignore') if stderr else "Unknown error"
-                # Don't log full error to avoid leaking sensitive info
-                logger.error(f"Claude Code CLI returned non-zero: {proc.returncode}")
-                raise Exception("Claude Code CLI error")
-            
-            response_text = stdout.decode('utf-8', errors='ignore').strip()
-            
-            # Validate response isn't too large
-            if len(response_text) > MAX_PROMPT_LENGTH:
-                logger.warning("Claude Code response truncated due to length")
-                response_text = response_text[:MAX_PROMPT_LENGTH]
-            
-            logger.debug(f"Claude Code response length: {len(response_text)} chars")
-            
-            return response_text
-            
-        except asyncio.TimeoutError:
-            logger.error("Claude Code CLI timed out")
-            raise Exception("Claude Code CLI timed out after 120 seconds")
-        except FileNotFoundError:
+        except CLINotFoundError as e:
             logger.error("Claude Code CLI not found")
-            raise Exception(
-                "Claude Code CLI not found. Please ensure 'claude' is installed and in PATH."
-            )
-        except Exception as e:
-            logger.error(f"Error calling Claude Code: {type(e).__name__}")
+            raise e
+        except CLITimeoutError as e:
+            logger.error("Claude Code CLI timed out")
+            raise e
+        except CLIError as e:
+            logger.error(f"Error calling Claude Code: {e}")
             raise
+
+        # Validate response isn't too large
+        if len(response_text) > MAX_PROMPT_LENGTH:
+            logger.warning("Claude Code response truncated due to length")
+            response_text = response_text[:MAX_PROMPT_LENGTH]
+
+        logger.debug(f"Claude Code response length: {len(response_text)} chars")
+
+        return response_text

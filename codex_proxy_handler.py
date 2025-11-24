@@ -1,9 +1,12 @@
-"""
-Codex Proxy Handler - Handles API requests routed through the proxy for Codex CLI.
-"""
-import asyncio
+"""Codex Proxy Handler - Handles API requests routed through the proxy for Codex CLI."""
 from typing import Any, Dict, Optional
 from claude_code_proxy_handler import ClaudeCodeProxyHandler, MAX_PROMPT_LENGTH, logger
+from utils import (
+    run_subprocess_async,
+    CLINotFoundError,
+    CLITimeoutError,
+    CLIError,
+)
 
 CODEX_VALID_MODELS = {
     "code-davinci-002",
@@ -48,31 +51,20 @@ class CodexProxyHandler(ClaudeCodeProxyHandler):
                 cmd.extend(["--model", short_name])
 
         try:
-            proc = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+            response_text = await run_subprocess_async(
+                cmd, prompt, "Codex", include_stderr=False
             )
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(input=prompt.encode("utf-8")),
-                timeout=120,
-            )
-            if proc.returncode != 0:
-                error_msg = stderr.decode("utf-8", errors="ignore") if stderr else "Unknown error"
-                logger.error(f"Codex CLI returned non-zero: {proc.returncode}")
-                raise Exception("Codex CLI error")
-            response_text = stdout.decode("utf-8", errors="ignore").strip()
-            if len(response_text) > MAX_PROMPT_LENGTH:
-                logger.warning("Codex response truncated due to length")
-                response_text = response_text[:MAX_PROMPT_LENGTH]
-            return response_text
-        except asyncio.TimeoutError:
-            logger.error("Codex CLI timed out")
-            raise Exception("Codex CLI timed out after 120 seconds")
-        except FileNotFoundError:
+        except CLINotFoundError as e:
             logger.error("Codex CLI not found")
-            raise Exception("Codex CLI not found. Please ensure 'codex' is installed and in PATH.")
-        except Exception as e:
-            logger.error(f"Error calling Codex: {type(e).__name__}")
+            raise e
+        except CLITimeoutError as e:
+            logger.error("Codex CLI timed out")
+            raise e
+        except CLIError as e:
+            logger.error(f"Error calling Codex: {e}")
             raise
+
+        if len(response_text) > MAX_PROMPT_LENGTH:
+            logger.warning("Codex response truncated due to length")
+            response_text = response_text[:MAX_PROMPT_LENGTH]
+        return response_text

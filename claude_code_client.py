@@ -1,11 +1,14 @@
-"""
-Claude Code Client - Interface for routing API calls to Claude Code CLI
-"""
-import subprocess
-import asyncio
+"""Claude Code Client - Interface for routing API calls to Claude Code CLI"""
 from typing import Dict, List, Optional
 from datetime import datetime
 from anthropic.types import Message, TextBlock, Usage
+from utils import (
+    run_subprocess,
+    run_subprocess_async,
+    CLINotFoundError,
+    CLITimeoutError,
+    CLIError,
+)
 
 
 class ClaudeCodeClient:
@@ -29,9 +32,13 @@ class ClaudeCodeClient:
         
         # Format conversation history
         for msg in messages:
-            role = msg.get("role", "")
-            content = msg.get("content", "")
-            
+            if isinstance(msg, dict):
+                role = msg.get("role", "")
+                content = msg.get("content", "")
+            else:
+                role = getattr(msg, "role", "")
+                content = getattr(msg, "content", "")
+
             # Handle different content types
             if isinstance(content, list):
                 # Handle multipart messages
@@ -41,7 +48,10 @@ class ClaudeCodeClient:
                         if part.get("type") == "text":
                             text_parts.append(part.get("text", ""))
                     else:
-                        text_parts.append(str(part))
+                        if getattr(part, "type", None) == "text":
+                            text_parts.append(getattr(part, "text", ""))
+                        else:
+                            text_parts.append(str(part))
                 content = " ".join(text_parts)
             
             if role == "user":
@@ -87,28 +97,9 @@ class ClaudeCodeClient:
                     cmd.extend(["--model", model_short])
         
         try:
-            # Run Claude Code CLI, passing the prompt via stdin to avoid
-            # command-line length limits
-            result = subprocess.run(
-                cmd,
-                input=prompt,
-                capture_output=True,
-                text=True,
-                timeout=120  # 2 minute timeout
-            )
-            
-            if result.returncode != 0:
-                error_msg = result.stderr or "Unknown error calling Claude Code"
-                raise Exception(f"Claude Code CLI error: {error_msg}")
-            
-            return result.stdout.strip()
-            
-        except subprocess.TimeoutExpired:
-            raise Exception("Claude Code CLI timed out after 120 seconds")
-        except FileNotFoundError:
-            raise Exception("Claude Code CLI not found. Please ensure 'claude' is installed and in PATH")
-        except Exception as e:
-            raise Exception(f"Error calling Claude Code: {str(e)}")
+            return run_subprocess(cmd, prompt, "Claude Code")
+        except (CLINotFoundError, CLITimeoutError, CLIError):
+            raise
     
     def create_message(
         self,
@@ -171,7 +162,7 @@ class ClaudeCodeClient:
         
         # Call Claude Code CLI asynchronously
         cmd = [self.claude_command, "--print"]
-        
+
         # Add model selection if specified
         if model:
             model_map = {
@@ -179,44 +170,25 @@ class ClaudeCodeClient:
                 "claude-3-sonnet-20240229": "sonnet",
                 "claude-3-haiku-20240307": "haiku",
                 "claude-3-5-sonnet-20241022": "sonnet",
-                "claude-3-5-haiku-20241022": "haiku"
+                "claude-3-5-haiku-20241022": "haiku",
             }
-            
+
             for full_name, short_name in model_map.items():
                 if full_name in model:
                     cmd.extend(["--model", short_name])
                     break
             else:
                 if any(name in model.lower() for name in ["opus", "sonnet", "haiku"]):
-                    model_short = next((name for name in ["opus", "sonnet", "haiku"] if name in model.lower()), "sonnet")
+                    model_short = next(
+                        (name for name in ["opus", "sonnet", "haiku"] if name in model.lower()),
+                        "sonnet",
+                    )
                     cmd.extend(["--model", model_short])
-        
-        try:
-            # Run Claude Code CLI asynchronously, sending the prompt via stdin
-            proc = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
 
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(input=prompt.encode()),
-                timeout=120
-            )
-            
-            if proc.returncode != 0:
-                error_msg = stderr.decode() if stderr else "Unknown error calling Claude Code"
-                raise Exception(f"Claude Code CLI error: {error_msg}")
-            
-            response_text = stdout.decode().strip()
-            
-        except asyncio.TimeoutError:
-            raise Exception("Claude Code CLI timed out after 120 seconds")
-        except FileNotFoundError:
-            raise Exception("Claude Code CLI not found. Please ensure 'claude' is installed and in PATH")
-        except Exception as e:
-            raise Exception(f"Error calling Claude Code: {str(e)}")
+        try:
+            response_text = await run_subprocess_async(cmd, prompt, "Claude Code")
+        except (CLINotFoundError, CLITimeoutError, CLIError):
+            raise
         
         # Create a Message object that matches Anthropic's format
         message = Message(

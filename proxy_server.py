@@ -504,7 +504,7 @@ async def start_proxy(
 ):
     """Start the mitmproxy server."""
     # Validate host and port
-    if not re.match(r'^[\\d.]+$|^localhost$|^[\\da-fA-F:]+$', host):
+    if not re.match(r'^[\d.]+$|^localhost$|^[\da-fA-F:]+$', host):
         raise ValueError(f"Invalid host: {host}")
     if not 1 <= port <= 65535:
         raise ValueError(f"Invalid port: {port}")
